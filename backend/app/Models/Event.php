@@ -21,10 +21,7 @@ class Event extends Model
         'jam_selesai',
         'lokasi',
         'kecamatan_id',
-        'lat',
-        'lng',
         'thumbnail',
-        'featured',
         'status',
     ];
 
