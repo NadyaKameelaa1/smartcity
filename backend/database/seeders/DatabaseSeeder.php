@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             PengumumanSeeder::class,
             PelayananSeeder::class,
             EventSeeder::class,
+            StatistikSeeder::class,
             // Seeder lainnya...
     ]);
     }
