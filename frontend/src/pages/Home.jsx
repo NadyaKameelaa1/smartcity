@@ -5,6 +5,7 @@ import WisataCard from '../components/WisataCard';
 import SmartSearchBar from '../components/SmartSearchBar';
 import PengumumanCard from '../components/PengumumanCard';
 import PelayananCard from '../components/PelayananCard';
+import EventCard from '../components/EventCard';
 import {
     wisataData,
     beritaData,
@@ -688,6 +689,59 @@ function PelayananSection() {
 // EVENT
 // ═══════════════════════════════════════════════════════════════
 function EventSection() {
+    const [eventList, setEventList] = useState([]);
+    const [loading,   setLoading]   = useState(true);
+    
+    useEffect(() => {
+        api.get('/events')
+            .then(res => {
+                const raw = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+                const now = new Date();
+ 
+                // Hanya event published yang belum lewat, max 4 card
+                const normalized = raw
+                    .filter(e =>
+                        e.status === 'published' &&
+                        e.tanggal_mulai &&
+                        new Date(e.tanggal_mulai) >= now
+                    )
+                    .sort((a, b) => new Date(a.tanggal_mulai) - new Date(b.tanggal_mulai))
+                    .slice(0, 4)
+                    .map(e => {
+                        const jam = [e.jam_mulai, e.jam_selesai]
+                            .filter(Boolean)
+                            .map(t => t.slice(0, 5).replace(':', '.'))
+                            .join(' - ') + ' WIB';
+ 
+                        const gambar = e.thumbnail
+                            ? e.thumbnail.startsWith('http')
+                                ? e.thumbnail
+                                : `${import.meta.env.VITE_APP_URL ?? 'http://localhost:8000'}/storage/event/${e.thumbnail}`
+                            : 'https://placehold.co/640x480?text=No+Image';
+ 
+                        return {
+                            id:            e.id,
+                            slug:          e.slug,
+                            nama:          e.nama,
+                            kategori:      e.kategori,
+                            penyelenggara: e.penyelenggara ?? '-',
+                            tanggal:       e.tanggal_mulai,
+                            jam,
+                            lokasi:        e.lokasi ?? '-',
+                            gambar,
+                        };
+                    });
+ 
+                setEventList(normalized);
+            })
+            .catch(err => {
+                console.error('Gagal fetch event di Home:', err);
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+    }, []);
+    
     return (
         <section className="event-section section" id="event">
             <div className="container">
@@ -703,33 +757,46 @@ function EventSection() {
                         </Link>
                     </div>
                 </FadeIn>
-                <div className="event-grid">
-                    {eventData.map((e) => {
-                        const { day, month } = formatTanggalEvent(e.tanggal);
-                        return (
-                            <FadeIn key={e.id}>
-                                <div className="event-card">
-                                    <div className="event-card-img-wrap">
-                                        <img src={e.gambar} alt={e.nama} className="event-card-img" />
-                                        <div className="event-date-badge">
-                                            <div className="event-date-day">{day}</div>
-                                            <div className="event-date-mon">{month}</div>
-                                        </div>
-                                    </div>
-                                    <div className="event-card-body">
-                                        <div className="event-category">{e.kategori}</div>
-                                        <h3 className="event-title">{e.nama}</h3>
-                                        <div className="event-info">
-                                            <div className="event-info-item"><i className="fas fa-clock" /> {e.jam}</div>
-                                            <div className="event-info-item"><i className="fas fa-map-marker-alt" /> {e.lokasi}</div>
-                                            <div className="event-info-item"><i className="fas fa-users" /> {e.penyelenggara}</div>
-                                        </div>
+
+                {loading ? (
+                    /* Skeleton 4 card */
+                    <div className="event-grid">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} style={{
+                                borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                                background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+                                animation: 'skPulse 1.4s ease-in-out infinite',
+                                animationDelay: `${i * .1}s`,
+                            }}>
+                                <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(255,255,255,.08)' }} />
+                                <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div style={{ height: 11, width: '35%', borderRadius: 6, background: 'rgba(255,255,255,.1)' }} />
+                                    <div style={{ height: 15, width: '85%', borderRadius: 6, background: 'rgba(255,255,255,.1)' }} />
+                                    <div style={{ height: 15, width: '65%', borderRadius: 6, background: 'rgba(255,255,255,.1)' }} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                                        {[80, 65, 55].map((w, j) => (
+                                            <div key={j} style={{ height: 10, width: `${w}%`, borderRadius: 6, background: 'rgba(255,255,255,.08)' }} />
+                                        ))}
                                     </div>
                                 </div>
+                            </div>
+                        ))}
+                        <style>{`@keyframes skPulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
+                    </div>
+                ) : eventList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,.5)' }}>
+                        <i className="fas fa-calendar-times" style={{ fontSize: 36, marginBottom: 12, display: 'block' }} />
+                        Belum ada event yang akan datang.
+                    </div>
+                ) : (
+                    <div className="event-grid">
+                        {eventList.map(e => (
+                            <FadeIn key={e.id}>
+                                <EventCard event={e} />
                             </FadeIn>
-                        );
-                    })}
-                </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </section>
     );
@@ -846,30 +913,51 @@ function PengumumanSection() {
 // STATISTIK
 // ═══════════════════════════════════════════════════════════════
 function StatistikSection() {
+    const [ringkasan, setRingkasan] = useState([]);
+    const [visual, setVisual] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Menggunakan api.get sesuai permintaanmu
+        api.get('/statistik-purbalingga')
+            .then(res => {
+                if (res.data.success) {
+                    setRingkasan(res.data.data.statistik_ringkasan);
+                    setVisual(res.data.data.statistik_visual);
+                }
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Gagal mengambil data statistik:", err);
+                setLoading(false);
+            });
+    }, []);
+
+    const getVal = (label) => {
+        const item = ringkasan.find(i => i.label === label);
+        return item ? `${item.nilai}` : '-';
+    };
+
     const cards = [
-        { icon: 'fa-users',          num: statistikData.penduduk,      label: 'Jumlah Penduduk' },
-        { icon: 'fa-map',            num: statistikData.kepadatan,     label: 'Kepadatan Penduduk' },
-        { icon: 'fa-th-large',       num: statistikData.kecamatan,     label: 'Jumlah Kecamatan' },
-        { icon: 'fa-home',           num: statistikData.desa,          label: 'Jumlah Desa/Kelurahan' },
-        { icon: 'fa-ruler-combined', num: statistikData.luas,          label: 'Luas Wilayah' },
-        { icon: 'fa-chart-line',     num: statistikData.ipm,           label: 'IPM Purbalingga' },
-        { icon: 'fa-coins',          num: statistikData.pdrb,          label: 'PDRB Per Kapita' },
-        { icon: 'fa-briefcase',      num: statistikData.angkatanKerja, label: 'Angkatan Kerja' },
+        { icon: 'fa-users',          num: getVal('Jumlah Penduduk'),      label: 'Jumlah Penduduk' },
+        { icon: 'fa-map',            num: getVal('Kepadatan Penduduk'),     label: 'Kepadatan Penduduk' },
+        { icon: 'fa-th-large',       num: getVal('Jumlah Kecamatan'),     label: 'Jumlah Kecamatan' },
+        { icon: 'fa-home',           num: getVal('Jumlah Desa/Kelurahan'),  label: 'Jumlah Desa/Kelurahan' },
+        { icon: 'fa-ruler-combined', num: getVal('Luas Wilayah'),          label: 'Luas Wilayah' },
+        { icon: 'fa-chart-line',     num: getVal('IPM Purbalingga'),       label: 'IPM Purbalingga' },
+        { icon: 'fa-coins',          num: getVal('PDRB Per Kapita'),       label: 'PDRB Per Kapita' },
+        { icon: 'fa-briefcase',      num: getVal('Angkatan Kerja'),        label: 'Angkatan Kerja' },
     ];
-    const pendidikan = [
-        { label: 'Tidak / Belum Sekolah', pct: 12, color: '#94a3b8' },
-        { label: 'SD / Sederajat',        pct: 38, color: '#64748b' },
-        { label: 'SMP / Sederajat',       pct: 22, color: '#0d9488' },
-        { label: 'SMA / SMK',             pct: 20, color: '#0f766e' },
-        { label: 'Diploma / Sarjana',     pct: 8,  color: '#2dd4bf' },
-    ];
-    const ekonomi = [
-        { label: 'Industri Pengolahan',   pct: 42, color: '#0d9488' },
-        { label: 'Pertanian & Kehutanan', pct: 28, color: '#16a34a' },
-        { label: 'Perdagangan',           pct: 16, color: '#2dd4bf' },
-        { label: 'Pariwisata & Jasa',     pct: 9,  color: '#d4a853' },
-        { label: 'Lainnya',               pct: 5,  color: '#94a3b8' },
-    ];
+
+    // Fungsi untuk mengambil data grafik berdasarkan judul
+    const getChartData = (judul) => {
+        const chart = visual.find(v => v.judul === judul);
+        return chart ? chart.data_json : [];
+    };
+
+    if (loading) {
+        return <div className="text-center py-20 text-white">Memuat data statistik...</div>;
+    }
 
     return (
         <section className="statistik-section section" id="statistik">
@@ -896,30 +984,45 @@ function StatistikSection() {
 
                 <FadeIn>
                     <div className="statistik-charts">
-                        {[{ title: 'Tingkat Pendidikan', icon: 'fa-graduation-cap', data: pendidikan },
-                          { title: 'Sektor Ekonomi Utama', icon: 'fa-industry', data: ekonomi }].map((chart) => (
-                            <div className="statistik-chart-card" key={chart.title}>
-                                <div className="chart-title"><i className={`fas ${chart.icon}`} style={{ color: 'var(--teal-300)', marginRight: 8 }} />{chart.title}</div>
-                                <div className="chart-bar-list">
-                                    {chart.data.map((row) => (
-                                        <div className="chart-bar-item" key={row.label}>
-                                            <div className="chart-bar-header"><span>{row.label}</span><span>{row.pct}%</span></div>
-                                            <div className="chart-bar-track"><div className="chart-bar-fill" style={{ width: `${row.pct}%`, background: row.color }} /></div>
-                                        </div>
-                                    ))}
-                                </div>
+                    {[
+                        { title: 'Tingkat Pendidikan', icon: 'fa-graduation-cap', data: getChartData('Tingkat Pendidikan') },
+                        { title: 'Sektor Ekonomi Utama', icon: 'fa-industry', data: getChartData('Sektor Ekonomi Utama') }
+                    ].map((chart) => (
+                        <div className="statistik-chart-card" key={chart.title}>
+                            <div className="chart-title">
+                                <i className={`fas ${chart.icon}`} style={{ color: 'var(--teal-300)', marginRight: 8 }} />
+                                {chart.title}
                             </div>
-                        ))}
-                    </div>
+                            <div className="chart-bar-list">
+                                {chart.data.length > 0 ? chart.data.map((row, idx) => (
+                                    <div className="chart-bar-item" key={idx}>
+                                        <div className="chart-bar-header">
+                                            <span>{row.label}</span>
+                                            <span>{row.pct}%</span>
+                                        </div>
+                                        <div className="chart-bar-track">
+                                            <div 
+                                                className="chart-bar-fill" 
+                                                style={{ width: `${row.pct}%`, background: row.color }} 
+                                            />
+                                        </div>
+                                    </div>
+                                )) : <p className="text-white opacity-50">Data tidak tersedia</p>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
                 </FadeIn>
 
                 <FadeIn>
                     <div style={{ textAlign: 'center', marginTop: 40 }}>
-                        <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 16 }}><i className="fas fa-info-circle" /> Data diperbarui berdasarkan BPS Kabupaten Purbalingga — 2025</p>
-                        <a href="https://purbalinggakab.bps.go.id" target="_blank" rel="noreferrer" className="btn btn-outline" style={{ borderColor: 'rgba(255,255,255,.3)', color: 'rgba(255,255,255,.8)' }}>
-                            <i className="fas fa-chart-line" /> Lihat Data Lengkap BPS
-                        </a>
-                    </div>
+                    <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 16 }}>
+                        <i className="fas fa-info-circle" /> Data diperbarui berdasarkan BPS Kabupaten Purbalingga — Realtime 2026
+                    </p>
+                    <a href="https://purbalinggakab.bps.go.id" target="_blank" rel="noreferrer" className="btn btn-outline" style={{ borderColor: 'rgba(255,255,255,.3)', color: 'rgba(255,255,255,.8)' }}>
+                        <i className="fas fa-chart-line" /> Lihat Data Lengkap BPS
+                    </a>
+                </div>
                 </FadeIn>
             </div>
         </section>
