@@ -2,6 +2,7 @@
 
 // use Illuminate\Http\Request;
 use App\Http\Controllers\Api\BeritaController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\PelayananController;
 use App\Http\Controllers\Api\PengumumanController;
 use App\Http\Controllers\Api\WisataController;
@@ -17,3 +18,5 @@ Route::get('/pengumuman', [PengumumanController::class, 'index']);
 Route::get('/pengumuman/{slug}', [PengumumanController::class, 'show']);
 
 Route::get('/pelayanan', [PelayananController::class, 'index']);
+
+Route::get('/events', [EventController::class, 'index']);

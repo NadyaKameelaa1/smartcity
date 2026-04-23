@@ -39,7 +39,7 @@ class PengumumanSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'judul' => 'Pengumuman Seleksi Administrasi Calon Anggota Direksi Perumda OWABONG Kabupaten Purbalingga Tahun 2025Tahun 2025',
+                'judul' => 'Pengumuman Seleksi Administrasi Calon Anggota Direksi Perumda OWABONG Kabupaten Purbalingga Tahun 2025',
                 'slug' => 'pengumuman-seleksi-administrasi-calon-anggota-direksi-perumda-owabong-kabupaten-purbalingga-tahun-2025',
                 'isi' => 'Berdasarkan pemeriksaan berkas atau dokumen administrasi dan hasil Rapat Panitia Seleksi Calon Anggota Direksi Perumda Owabong Kabupaten Purbalingga Tahun 2025 pada Hari Senin, 23 Juni 2025 maka peserta yang dinyatakan memenuhi persyaratan administrasi dapat dilihat pada lampiran dokumen.',
                 'publisher' => 'Dinkominfo',

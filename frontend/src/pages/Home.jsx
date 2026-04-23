@@ -613,8 +613,12 @@ function BeritaSection() {
 // Hanya tampilkan 8 layanan pertama (urutan terendah / featured),
 // sisanya tersedia di halaman /pelayanan
 // ═══════════════════════════════════════════════════════════════
+// Ganti PelayananSection di Home.jsx dengan ini.
+// Pastikan sudah ada import di atas Home.jsx:
+//   import PelayananCard from '../components/PelayananCard';
+// Dan hapus 'pelayananData' dari import mockData jika tidak dipakai di tempat lain.
+
 function PelayananSection() {
-    // Ambil 8 pertama — nanti ganti dengan slice dari API
     const [pelayananList, setPelayananList] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -630,7 +634,8 @@ function PelayananSection() {
             });
     }, []);
 
-    const visible = pelayananData.slice(0, 8);
+    // ✅ Fix: pakai pelayananList (dari API), bukan pelayananData (mock)
+    const visible = pelayananList.slice(0, 8);
 
     return (
         <section className="pelayanan-section section" id="pelayanan">
@@ -654,7 +659,6 @@ function PelayananSection() {
                     </div>
                 ) : (
                     <>
-                        {/* Pakai class pelayanan-grid (bawaan CSS Home) bukan pelayanan-cards-grid */}
                         <div className="pelayanan-grid">
                             {visible.map(p => (
                                 <FadeIn key={p.id}>
@@ -662,8 +666,7 @@ function PelayananSection() {
                                 </FadeIn>
                             ))}
                         </div>
- 
-                        {/* Tombol lihat semua */}
+
                         {pelayananList.length > 8 && (
                             <FadeIn>
                                 <div style={{ textAlign: 'center', marginTop: 36 }}>
