@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class EventSeeder extends Seeder
@@ -14,19 +14,19 @@ class EventSeeder extends Seeder
     {
         $data = [
             [
-                'nama' => 'Beragam Pelayanan Publik dan Spot Olahraga Meriahkan Purbalingga Car Free Day',
-                'slug' => 'beragam-pelayanan-publik-dan-spot-olahraga-meriahkan-purbalingga-car-free-day',
-                'kategori' => 'Olahraga',
-                'penyelenggara' => 'Pemerintah Kabupaten Purbalingga',
-                'tanggal_mulai' => '2025-06-22',
+                'nama' => 'Melepas Penat 2026: Purbalingga',
+                'slug' => 'melepas-penat-2026-purbalingga',
+                'kategori' => 'Hiburan',
+                'penyelenggara' => 'Shaolin Music',
+                'tanggal_mulai' => '2026-06-27',
                 'tanggal_selesai' => null,
-                'jam_mulai' => '06:00',
-                'jam_selesai' => '09.00',
-                'lokasi' => 'Alun-Alun Purbalingga dan GOR Goentoer Darjono',
+                'jam_mulai' => '15:00',
+                'jam_selesai' => '23:00',
+                'lokasi' => 'GOR Goentoer Darjono',
                 'kecamatan_id' => 5,
-                'thumbnail' => 'beragam-pelayanan-publik-dan-spot-olahraga-meriahkan-purbalingga-car-free-day.jpg',
+                'thumbnail' => 'melepas-penat-2026-purbalingga.jpeg',
                 'status' => 'published',
-            ],
+            ]
         ];
 
         foreach ($data as $item) {

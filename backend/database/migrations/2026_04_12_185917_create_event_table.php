@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('nama', 200);
             $table->string('slug', 220)->unique();
-            $table->enum('kategori', ['Budaya', 'Olahraga', 'Pemerintahan', 'Pariwisata', 'Pendidikan', 'Lainnya']);
+            $table->enum('kategori', ['Budaya', 'Olahraga', 'Pemerintahan', 'Pariwisata', 'Pendidikan', 'Hiburan', 'Lainnya']);
             $table->string('penyelenggara', 150)->nullable();
             $table->date('tanggal_mulai');
             $table->date('tanggal_selesai')->nullable();
