@@ -25,7 +25,7 @@ export default function Wisata() {
 
     // Fetch data dari API Laravel
     useEffect(() => {
-        api.get('http://192.168.40.128:8000/api/wisata')
+        api.get('/wisata')
             .then(res => {
                 setWisataData(res.data.data);
                 setLoading(false);

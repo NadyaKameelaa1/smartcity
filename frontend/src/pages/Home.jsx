@@ -426,10 +426,6 @@ function MengenalSection() {
     );
 }
 
-// ── Ganti WisataSection di Home.jsx ─────────────────────────
-// Tambahkan useNavigate ke import di atas:
-// import { Link, useNavigate } from 'react-router-dom';
-
 function WisataSection() {
     const [wisataPreview, setWisataPreview] = useState([]);
     const [loading, setLoading] = useState(true);

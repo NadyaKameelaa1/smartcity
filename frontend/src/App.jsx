@@ -38,6 +38,7 @@ import KelolaWisata from './pages/superadmin/KelolaWisata';
 import KelolaBerita from './pages/superadmin/KelolaBerita';
 import KelolaPengumuman from './pages/superadmin/KelolaPengumuman';
 import KelolaEvent from './pages/superadmin/KelolaEvent';
+import KelolaBangunan from './pages/superadmin/KelolaBangunan';
 
 // Scroll ke atas setiap ganti halaman
 function ScrollToTop() {
@@ -65,7 +66,8 @@ const FULLSCREEN_PAGES = [
     '/super-admin/pengumuman',
     '/super-admin/event',
     '/super-admin/pengaturan',
-    '/super-admin/statistik'];
+    '/super-admin/statistik',
+    '/super-admin/bangunan'];
 
 function Layout() {
     const { pathname } = useLocation();
@@ -126,6 +128,7 @@ function Layout() {
                     {/* Buatin ini : */}
                     <Route path="/super-admin/pengumuman" element={<KelolaPengumuman />} />
                     <Route path="/super-admin/event" element={<KelolaEvent />} />
+                    <Route path="/super-admin/bangunan" element={<KelolaBangunan />} />
                     
 
                     {/* -------------------------------------------------------------- */}

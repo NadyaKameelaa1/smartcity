@@ -272,7 +272,8 @@ const NAV_GROUPS = [
       { icon: "fa-solid fa-mountain-sun", label: "Wisata", path: "/super-admin/wisata" },
       { icon: "fa-solid fa-newspaper", label: "Berita", path: "/super-admin/berita" },
       { icon: "fa-solid fa-bullhorn", label: "Pengumuman", path: "/super-admin/pengumuman" },
-      { icon: "fa-solid fa-calendar-star", label: "Event", path: "/super-admin/event" },
+      { icon: "fa-solid fa-calendar", label: "Event", path: "/super-admin/event" },
+      { icon: "fa-solid fa-building", label: "Bangunan", path: "/super-admin/bangunan" },
     ],
   },
   {

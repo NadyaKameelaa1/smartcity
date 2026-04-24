@@ -3,6 +3,7 @@
 // use Illuminate\Http\Request;
 use App\Http\Controllers\Api\BeritaController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\KecamatanController;
 use App\Http\Controllers\Api\PelayananController;
 use App\Http\Controllers\Api\PengumumanController;
 use App\Http\Controllers\Api\StatistikController;
@@ -23,3 +24,14 @@ Route::get('/pelayanan', [PelayananController::class, 'index']);
 Route::get('/events', [EventController::class, 'index']);
 
 Route::get('/statistik-purbalingga', [StatistikController::class, 'index']);
+
+// -------------------------------------------------------------------------
+
+Route::get('super-admin/wisata', [WisataController::class, 'index']);
+
+Route::get('/super-admin/berita', [BeritaController::class, 'index']);
+
+
+
+
+Route::get('super-admin/kecamatan', [KecamatanController::class, 'index']);

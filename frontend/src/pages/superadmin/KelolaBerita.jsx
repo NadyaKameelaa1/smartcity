@@ -469,7 +469,7 @@ export default function KelolaBerita() {
   const fetchBerita = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/superadmin/berita");
+      const res = await api.get("/super-admin/berita");
       setBeritaList(res.data.data || res.data || []);
     } catch {
       showToast("Gagal memuat data berita.", "error");

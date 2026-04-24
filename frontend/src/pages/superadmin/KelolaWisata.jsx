@@ -396,7 +396,7 @@ const PER_PAGE = 10;
 const STATUS_LIST = ["aktif", "nonaktif", "draft"];
 
 const EMPTY_FORM = {
-  nama_wisata: "", kategori: "", deskripsi: "",
+  nama: "", kategori: "", deskripsi: "",
   kecamatan_id: "", jam_buka: "", jam_tutup: "",
   fasilitas: "", kontak: "", status: "draft",
   thumbnail: null,
@@ -451,8 +451,8 @@ export default function KelolaWisata() {
     setLoading(true);
     try {
       const [wRes, kRes] = await Promise.all([
-        api.get("/superadmin/wisata"),
-        api.get("/superadmin/kecamatan"),
+        api.get("/super-admin/wisata"),
+        api.get("/super-admin/kecamatan"),
       ]);
       setWisataList(wRes.data.data || wRes.data || []);
       setKecamatanList(kRes.data.data || kRes.data || []);
@@ -471,7 +471,7 @@ export default function KelolaWisata() {
   // ── Filtering ──
   const filtered = wisataList.filter((w) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || w.nama_wisata?.toLowerCase().includes(q) || w.kategori?.toLowerCase().includes(q);
+    const matchSearch = !q || w.nama?.toLowerCase().includes(q) || w.kategori?.toLowerCase().includes(q);
     const matchStatus = filterStatus === "semua" || w.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -506,7 +506,7 @@ export default function KelolaWisata() {
   const openEdit = (w) => {
     setEditTarget(w);
     setForm({
-      nama_wisata: w.nama_wisata || "",
+      nama: w.nama || "",
       kategori: w.kategori || "",
       deskripsi: w.deskripsi || "",
       kecamatan_id: w.kecamatan_id || "",
@@ -538,7 +538,7 @@ export default function KelolaWisata() {
 
   const validate = () => {
     const err = {};
-    if (!form.nama_wisata.trim()) err.nama_wisata = "Nama wisata wajib diisi.";
+    if (!form.nama.trim()) err.nama = "Nama wisata wajib diisi.";
     if (!form.kategori.trim())    err.kategori    = "Kategori wajib diisi.";
     if (!form.kecamatan_id)       err.kecamatan_id = "Pilih kecamatan.";
     return err;
@@ -556,11 +556,11 @@ export default function KelolaWisata() {
         fd.append("_method", "PUT");
         await api.post(`/superadmin/wisata/${editTarget.id}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
         setWisataList((prev) => prev.map((w) => w.id === editTarget.id ? { ...w, ...form, thumbnail_url: previewUrl } : w));
-        showToast(`Wisata "${form.nama_wisata}" berhasil diperbarui.`);
+        showToast(`Wisata "${form.nama}" berhasil diperbarui.`);
       } else {
         const res = await api.post("/superadmin/wisata", fd, { headers: { "Content-Type": "multipart/form-data" } });
         setWisataList((prev) => [res.data.data || res.data, ...prev]);
-        showToast(`Wisata "${form.nama_wisata}" berhasil ditambahkan.`);
+        showToast(`Wisata "${form.nama}" berhasil ditambahkan.`);
       }
       closeModal();
     } catch (e) {
@@ -575,7 +575,7 @@ export default function KelolaWisata() {
     try {
       await api.delete(`/superadmin/wisata/${w.id}`);
       setWisataList((prev) => prev.filter((x) => x.id !== w.id));
-      showToast(`Wisata "${w.nama_wisata}" berhasil dihapus.`);
+      showToast(`Wisata "${w.nama}" berhasil dihapus.`);
     } catch {
       showToast("Gagal menghapus data.", "error");
     }
@@ -697,11 +697,11 @@ export default function KelolaWisata() {
                       <td><span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "monospace" }}>#{w.id}</span></td>
                       <td>
                         {w.thumbnail_url || w.gambar
-                          ? <img src={w.thumbnail_url || w.gambar} alt={w.nama_wisata} className="kw-thumb" />
+                          ? <img src={w.thumbnail_url || w.gambar} alt={w.nama} className="kw-thumb" />
                           : <div className="kw-thumb-placeholder"><i className="fa-solid fa-image" /></div>
                         }
                       </td>
-                      <td style={{ fontWeight: 700, minWidth: 150 }}>{w.nama_wisata}</td>
+                      <td style={{ fontWeight: 700, minWidth: 150 }}>{w.nama}</td>
                       <td><span className="kw-kategori"><i className="fa-solid fa-tag" style={{ fontSize: 9 }} />{w.kategori || "—"}</span></td>
                       <td><DescCell text={w.deskripsi} /></td>
                       <td style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{kecamatanName(w.kecamatan_id)}</td>
@@ -767,7 +767,7 @@ export default function KelolaWisata() {
                 <div className="kw-modal-header-icon"><i className={`fa-solid ${editTarget ? "fa-pen-to-square" : "fa-plus"}`} /></div>
                 <div>
                   <div className="kw-modal-title">{editTarget ? "Edit Wisata" : "Tambah Wisata Baru"}</div>
-                  <div className="kw-modal-sub">{editTarget ? `Mengedit: ${editTarget.nama_wisata}` : "Lengkapi data destinasi wisata"}</div>
+                  <div className="kw-modal-sub">{editTarget ? `Mengedit: ${editTarget.nama}` : "Lengkapi data destinasi wisata"}</div>
                 </div>
               </div>
               <button className="kw-modal-close" onClick={closeModal}><i className="fa-solid fa-xmark" /></button>
@@ -779,8 +779,8 @@ export default function KelolaWisata() {
               <div className="kw-field-row">
                 <div className="kw-field">
                   <label className="kw-label"><i className="fa-solid fa-mountain-sun" /> Nama Wisata <span className="kw-required">*</span></label>
-                  <input className={`kw-input${formErr.nama_wisata ? " error" : ""}`} placeholder="Nama destinasi wisata" value={form.nama_wisata} onChange={(e) => handleFormChange("nama_wisata", e.target.value)} />
-                  {formErr.nama_wisata && <span className="kw-error-msg"><i className="fa-solid fa-circle-exclamation" />{formErr.nama_wisata}</span>}
+                  <input className={`kw-input${formErr.nama ? " error" : ""}`} placeholder="Nama destinasi wisata" value={form.nama} onChange={(e) => handleFormChange("nama", e.target.value)} />
+                  {formErr.nama && <span className="kw-error-msg"><i className="fa-solid fa-circle-exclamation" />{formErr.nama}</span>}
                 </div>
                 <div className="kw-field">
                   <label className="kw-label"><i className="fa-solid fa-tag" /> Kategori <span className="kw-required">*</span></label>
@@ -872,7 +872,7 @@ export default function KelolaWisata() {
           <div className="kw-confirm-box">
             <div className="kw-confirm-icon"><i className="fa-solid fa-trash" /></div>
             <div className="kw-confirm-title">Hapus Wisata?</div>
-            <div className="kw-confirm-desc">Wisata <strong>{confirmDel.nama_wisata}</strong> akan dihapus secara permanen beserta seluruh data terkait.</div>
+            <div className="kw-confirm-desc">Wisata <strong>{confirmDel.nama}</strong> akan dihapus secara permanen beserta seluruh data terkait.</div>
             <div className="kw-confirm-btns">
               <button className="kw-confirm-btn kw-confirm-btn--cancel" onClick={() => setConfirmDel(null)}>Batal</button>
               <button className="kw-confirm-btn kw-confirm-btn--del" onClick={handleDelete}><i className="fa-solid fa-trash" style={{ marginRight: 6 }} />Ya, Hapus</button>
