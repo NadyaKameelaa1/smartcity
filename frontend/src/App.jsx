@@ -25,6 +25,20 @@ import WisataDetail from './pages/WisataDetail';
 import Login from './pages/Login';
 import Daftar from './pages/Daftar';
 
+// -----------------------------------------------------------
+import InformasiWisata from './pages/admin/InformasiWisata';
+import KelolaTiket from './pages/admin/KelolaTiket';
+// import AdminLayout from './pages/admin/AdminLayout';
+// import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
+import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
+import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
+import KelolaAkun from './pages/superadmin/KelolaAkun';
+import AdminLogin from './pages/admin/AdminLogin';
+import KelolaWisata from './pages/superadmin/KelolaWisata';
+import KelolaBerita from './pages/superadmin/KelolaBerita';
+import KelolaPengumuman from './pages/superadmin/KelolaPengumuman';
+import KelolaEvent from './pages/superadmin/KelolaEvent';
+
 // Scroll ke atas setiap ganti halaman
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -33,7 +47,25 @@ function ScrollToTop() {
 } 
 
 // Halaman yang tidak pakai Navbar/Footer
-const FULLSCREEN_PAGES = ['/peta', '/login', '/daftar'];
+const FULLSCREEN_PAGES = [
+    '/peta', 
+    '/login', 
+    '/daftar', 
+    '/admin', 
+    '/admin/', 
+    '/admin/informasi-wisata', 
+    '/admin/login', 
+    '/admin/kelola-tiket', 
+    '/super-admin/login', 
+    '/super-admin/dashboard', 
+    '/super-admin', 
+    '/super-admin/akun', 
+    '/super-admin/wisata', 
+    '/super-admin/berita',
+    '/super-admin/pengumuman',
+    '/super-admin/event',
+    '/super-admin/pengaturan',
+    '/super-admin/statistik'];
 
 function Layout() {
     const { pathname } = useLocation();
@@ -74,6 +106,29 @@ function Layout() {
                     <Route path="/profile"            element={<Profile />} />
                     <Route path="/peta"               element={<Peta />} />
                     <Route path="/profile/edit" element={<EditProfile />} />
+
+                    {/* -------------------------------------------------------------- */}
+                    {/* Admin */}
+
+                    <Route path="/admin/*" element={<InformasiWisata />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/admin/kelola-tiket" element={<KelolaTiket />} />
+
+                    {/* -------------------------------------------------------------- */}
+                    {/* Super Admin */}
+
+                    <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+                    <Route path="/super-admin" element={<SuperAdminLayout />} />
+                    <Route path="/super-admin/akun" element={<KelolaAkun />} />
+                    <Route path="/super-admin/wisata" element={<KelolaWisata />} />
+                    <Route path="/super-admin/berita" element={<KelolaBerita />} />
+
+                    {/* Buatin ini : */}
+                    <Route path="/super-admin/pengumuman" element={<KelolaPengumuman />} />
+                    <Route path="/super-admin/event" element={<KelolaEvent />} />
+                    
+
+                    {/* -------------------------------------------------------------- */}
                     {/* 404 fallback */}
                     <Route path="*"                   element={<NotFound />} />
                 </Routes>
