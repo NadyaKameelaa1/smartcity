@@ -19,7 +19,7 @@ return [
     
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:8000', 'http://127.0.0.1:8000', 'http://192.168.40.128:5173', 'http://192.168.40.128:8000', 'http://192.168.40.128:0.0.0.0', 'http://smartcitybackend-main-oqgeeg.free.laravel.cloud', 'https://purbalinggasmartcity.netlify.app'],
+    'allowed_origins' => ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:5173', 'http://localhost:8000', 'http://localhost:0.0.0.0', 'http://smartcitybackend-main-oqgeeg.free.laravel.cloud', 'https://purbalinggasmartcity.netlify.app', '/^http:\/\/192\.168\..*/'],
 
     'allowed_origins_patterns' => [],
 

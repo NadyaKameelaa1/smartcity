@@ -12,7 +12,6 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    // Karena ID tim SSO adalah UUID (varchar 36)
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -22,51 +21,30 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'id',
-        'email',
         'username',
-        'password',
         'name',
-        'avatarUrl',
+        'email',
+        'password',
+        'avatar_url',
+        'kecamatan_id',
         'no_hp',
         'tanggal_lahir',
         'jenis_kelamin',
-        'kecamatan_id',
         'role',
-        'isVerified',
-        'verifyToken',
-        'verifyTokenExpiry',
-        'mfaSecret',
-        'mfaEnabled',
-        'resetToken',
-        'resetTokenExpiry',
-        'wisata_id', // Relasi tambahan milikmu
+        'wisata_id',
     ];
 
     protected $hidden = [
         'password',
-        'remember_token',
-        'verifyToken',
-        'mfaSecret',
     ];
-
-    /**
-     * Konfigurasi Timestamp.
-     * SSO menggunakan camelCase: createdAt & updatedAt.
-     */
-    const CREATED_AT = 'createdAt';
-    const UPDATED_AT = 'updatedAt';
 
     protected function casts(): array
     {
         return [
             'password' => 'hashed',
             'tanggal_lahir' => 'date:Y-m-d',
-            'isVerified' => 'boolean',
-            'mfaEnabled' => 'boolean',
-            'verifyTokenExpiry' => 'datetime',
-            'resetTokenExpiry' => 'datetime',
-            'createdAt' => 'datetime',
-            'updatedAt' => 'datetime',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 

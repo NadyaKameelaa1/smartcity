@@ -31,7 +31,6 @@ class DatabaseSeeder extends Seeder
             CctvSeeder::class,       // CCTV saja
             MapMarkerSeeder::class,  // Baru kemudian tempelkan Marker ke CCTV
             UserSeeder::class,
-            OauthClientSeeder::class,
             BeritaSeeder::class,
             PengumumanSeeder::class,
             PelayananSeeder::class,

@@ -16,19 +16,19 @@ class CctvSeeder extends Seeder
         $cctvs = [
             [
                 'nama' => 'Alun-alun Purbalingga',
-                'stream_url' => 'https://www.youtube.com/embed/jfKfPfyJRdk', // Dummy live
+                'stream_url' => 'https://www.youtube.com/embed/n7FLPsRLboI', // Dummy live
             ],
             [
                 'nama' => 'Simpang Empat Terminal',
-                'stream_url' => 'https://www.youtube.com/embed/jfKfPfyJRdk',
+                'stream_url' => 'https://www.youtube.com/embed/JJ3MWNYVCU4',
             ],
             [
                 'nama' => 'Simpang Empat Bancar',
-                'stream_url' => 'https://www.youtube.com/embed/jfKfPfyJRdk',
+                'stream_url' => 'https://www.youtube.com/embed/PZFDeJ4Wf1Y',
             ],
             [
                 'nama' => 'Pasar Segamas',
-                'stream_url' => 'https://www.youtube.com/embed/jfKfPfyJRdk',
+                'stream_url' => 'https://www.youtube.com/embed/XhmQkH-8_qw',
             ],
         ];
 

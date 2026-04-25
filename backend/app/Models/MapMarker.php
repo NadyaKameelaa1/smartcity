@@ -10,17 +10,27 @@ class MapMarker extends Model
 {
     protected $table = 'map_markers';
 
+    /**
+     * Kolom di tabel map_markers (sesuai gambar DB):
+     * id, category_id, markable_type, markable_id, lat, lng, created_at, updated_at
+     *
+     * TIDAK ADA: is_active, title, description, dsb.
+     */
     protected $fillable = [
         'category_id',
         'markable_type',
         'markable_id',
         'lat',
         'lng',
-        'is_active'
+    ];
+
+    protected $casts = [
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     /**
-     * Relasi MorphTo: Mengambil data pemilik marker (bisa Wisata atau Cctv).
+     * Relasi polymorphic — marker bisa milik Building, Kecamatan, Desa, CCTV, dll.
      */
     public function markable(): MorphTo
     {
@@ -28,7 +38,7 @@ class MapMarker extends Model
     }
 
     /**
-     * Relasi ke BuildingCategory.
+     * Relasi ke BuildingCategory (opsional, untuk filter marker per kategori di peta).
      */
     public function category(): BelongsTo
     {

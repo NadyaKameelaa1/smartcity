@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Kecamatan;
+use App\Models\Desa;
+// use App\Models\Kecamatan;
 // use Illuminate\Http\Request;
 
-class KecamatanController extends Controller
+class DesaController extends Controller
 {
-
     public function index(){
-        $kecamatan = Kecamatan::all();
+        $kecamatan = Desa::all();
         return response()->json(['data' => $kecamatan]);
     }
 }

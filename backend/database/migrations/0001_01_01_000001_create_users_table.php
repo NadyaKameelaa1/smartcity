@@ -14,11 +14,12 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             // Pakai UUID sesuai standar tim SSO
             $table->uuid('id')->primary(); 
-            $table->string('email', 255)->unique();
             $table->string('username', 255)->unique();
-            $table->string('password', 255);
             $table->string('name', 255); // SSO pakai 'name', bukan 'full_name'
-            $table->string('avatarUrl', 255)->nullable();
+            $table->string('email', 255)->unique();
+            $table->string('password', 255);
+            
+            $table->string('avatar_url', 255)->nullable();
 
             // YANG DITAMBAHIN :
             $table->foreignId('kecamatan_id')
@@ -40,19 +41,9 @@ return new class extends Migration
                 ->constrained('wisata')
                 ->onDelete('set null');
 
-            // ---------------------
-            
-            $table->tinyInteger('isVerified')->default(0);
-            $table->string('verifyToken', 255)->nullable();
-            $table->datetime('verifyTokenExpiry')->nullable();
-            $table->string('mfaSecret', 255)->nullable();
-            $table->tinyInteger('mfaEnabled')->default(0);
-            $table->string('resetToken', 255)->nullable();
-            $table->datetime('resetTokenExpiry')->nullable();
-            
+            $table->timestamps();
+
             $table->rememberToken();
-            $table->dateTime('createdAt', 6)->nullable();
-            $table->dateTime('updatedAt', 6)->nullable();
         });
 
         // Sesuaikan tabel sessions karena user_id sekarang UUID (string)

@@ -24,9 +24,11 @@ class Wisata extends Model
         'rating' => 'float',
     ];
 
+    // app/Models/Wisata.php
+
     public function kecamatan()
     {
-        return $this->belongsTo(Kecamatan::class);
+        return $this->belongsTo(Kecamatan::class, 'kecamatan_id');
     }
 
     // Relasi ke tabel ratings
