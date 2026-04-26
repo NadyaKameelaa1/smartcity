@@ -1,26 +1,45 @@
 // src/pages/Tiket.jsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { wisataData } from '../data/mockData';
+import api from '../api/axios';
 
 // ─── Helpers ─────────────────────────────────────────────────
-const formatRupiah = (n) => 'Rp ' + n.toLocaleString('id-ID');
+const formatRupiah = (n) => {
+    if (!n || n === 0) return 'Gratis';
+    return 'Rp ' + Number(n).toLocaleString('id-ID');
+};
+
 const randomBookingId = () => 'PBG-' + Math.random().toString(36).toUpperCase().slice(2, 8);
+
+const getTodayString = () => new Date().toISOString().split('T')[0];
+
+// Cek apakah tanggal tertentu adalah weekend (Sabtu=6, Minggu=0)
+const isWeekend = (dateStr) => {
+    if (!dateStr) return false;
+    const day = new Date(dateStr + 'T12:00:00').getDay();
+    return day === 0 || day === 6;
+};
+
+// Ambil harga yang sesuai berdasarkan tanggal
+const getHargaByDate = (prices, dateStr) => {
+    if (!prices || prices.length === 0) return { harga_dewasa: 0, harga_anak: 0 };
+    const dayType = isWeekend(dateStr) ? 'weekend' : 'weekday';
+    const found = prices.find(p => p.day_type === dayType);
+    // Fallback ke entry pertama jika tidak ada
+    return found || prices[0];
+};
+
+const BASE_IMAGE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '') + '/storage/';
 
 // ─── CSS ─────────────────────────────────────────────────────
 const STYLE = `
 .tiket-input {
-    width: 100%;
-    padding: 13px 18px;
+    width: 100%; padding: 13px 18px;
     border-radius: var(--radius-md);
     border: 1.5px solid var(--border);
-    font-size: 14px;
-    font-family: var(--font-body);
-    outline: none;
-    background: white;
-    box-sizing: border-box;
-    transition: border-color .2s, box-shadow .2s;
-    color: var(--text-dark);
+    font-size: 14px; font-family: var(--font-body);
+    outline: none; background: white; box-sizing: border-box;
+    transition: border-color .2s, box-shadow .2s; color: var(--text-dark);
 }
 .tiket-input:focus {
     border-color: var(--teal-500);
@@ -28,26 +47,25 @@ const STYLE = `
 }
 .tiket-input.error { border-color: #ef4444; }
 .tiket-input.error:focus { box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
-.tiket-textarea {
-    width: 100%;
-    padding: 13px 18px;
+.tiket-select {
+    width: 100%; padding: 13px 18px;
     border-radius: var(--radius-md);
     border: 1.5px solid var(--border);
-    font-size: 14px;
-    font-family: var(--font-body);
-    outline: none;
-    background: white;
-    resize: vertical;
-    box-sizing: border-box;
-    transition: border-color .2s, box-shadow .2s;
-    color: var(--text-dark);
+    font-size: 14px; font-family: var(--font-body);
+    outline: none; background: white; box-sizing: border-box;
+    transition: border-color .2s, box-shadow .2s; color: var(--text-dark);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 42px;
+    cursor: pointer;
 }
-.tiket-textarea:focus {
+.tiket-select:focus {
     border-color: var(--teal-500);
     box-shadow: 0 0 0 3px rgba(79,131,191,.15);
 }
-
-/* Pulse animation untuk icon centang */
+.tiket-select.error { border-color: #ef4444; }
 @keyframes successPulse {
     0%   { transform: scale(0.5); opacity: 0; }
     60%  { transform: scale(1.1); opacity: 1; }
@@ -61,14 +79,8 @@ const STYLE = `
 .success-card { animation: fadeSlideUp .4s ease .2s both; }
 .success-steps { animation: fadeSlideUp .4s ease .35s both; }
 .success-actions { animation: fadeSlideUp .4s ease .5s both; }
-
-/* Step card hover */
 .step-card:hover { background: var(--teal-50) !important; border-color: var(--teal-300) !important; }
 `;
-
-function InjectStyle() {
-    return <style>{STYLE}</style>;
-}
 
 // ─── Step Indicator ──────────────────────────────────────────
 const STEPS = [
@@ -114,32 +126,57 @@ function StepIndicator({ current }) {
     );
 }
 
-// ─── Order Summary (sidebar) ─────────────────────────────────
-function OrderSummary({ wisata, qty }) {
+// ─── Order Summary (sidebar) ──────────────────────────────────
+function OrderSummary({ wisata, qty, tanggal }) {
     if (!wisata) return null;
-    const total = qty.dewasa * wisata.harga_dewasa + qty.anak * wisata.harga_anak;
+
+    const harga = getHargaByDate(wisata.prices, tanggal);
+    const total = qty.dewasa * (harga.harga_dewasa || 0) + qty.anak * (harga.harga_anak || 0);
+    const dayType = isWeekend(tanggal) ? 'Weekend' : 'Weekday';
+    const thumb = wisata.thumbnail
+        ? (wisata.thumbnail.startsWith('http') ? wisata.thumbnail : BASE_IMAGE_URL + wisata.thumbnail)
+        : null;
+
     return (
         <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)', overflow: 'hidden', position: 'sticky', top: 100 }}>
-            <img src={wisata.gambar} alt={wisata.nama} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+            {thumb
+                ? <img src={thumb} alt={wisata.nama} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: 160, background: 'var(--teal-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="fas fa-mountain" style={{ fontSize: 40, color: 'var(--teal-400)' }} />
+                  </div>
+            }
             <div style={{ padding: 24 }}>
                 <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--teal-600)', fontWeight: 600, marginBottom: 4 }}>{wisata.kategori}</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--dark)', marginBottom: 8 }}>{wisata.nama}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 20 }}>
-                    <i className="fas fa-map-marker-alt" style={{ color: 'var(--teal-500)' }} /> {wisata.lokasi}
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 16 }}>
+                    <i className="fas fa-map-marker-alt" style={{ color: 'var(--teal-500)' }} />
+                    {wisata.alamat_lengkap || 'Purbalingga'}
                 </div>
+
+                {/* Info harga aktif */}
+                {tanggal && (
+                    <div style={{ padding: '8px 12px', background: isWeekend(tanggal) ? '#fef9c3' : '#f0fdf4', border: `1px solid ${isWeekend(tanggal) ? '#fde047' : '#bbf7d0'}`, borderRadius: 8, fontSize: 12, color: isWeekend(tanggal) ? '#713f12' : '#14532d', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className={`fas ${isWeekend(tanggal) ? 'fa-sun' : 'fa-briefcase'}`} />
+                        Harga {dayType} berlaku untuk tanggal ini
+                    </div>
+                )}
+
                 <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Rincian Tiket</div>
                     {qty.dewasa > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
                             <span>Dewasa × {qty.dewasa}</span>
-                            <span style={{ fontWeight: 600 }}>{formatRupiah(qty.dewasa * wisata.harga_dewasa)}</span>
+                            <span style={{ fontWeight: 600 }}>{formatRupiah(qty.dewasa * (harga.harga_dewasa || 0))}</span>
                         </div>
                     )}
                     {qty.anak > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
                             <span>Anak-anak × {qty.anak}</span>
-                            <span style={{ fontWeight: 600 }}>{formatRupiah(qty.anak * wisata.harga_anak)}</span>
+                            <span style={{ fontWeight: 600 }}>{formatRupiah(qty.anak * (harga.harga_anak || 0))}</span>
                         </div>
+                    )}
+                    {(qty.dewasa + qty.anak) === 0 && (
+                        <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>Belum ada tiket dipilih</div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, paddingTop: 12, borderTop: '1px solid var(--border)', marginTop: 8, color: 'var(--dark)' }}>
                         <span>Total</span>
@@ -157,11 +194,19 @@ function OrderSummary({ wisata, qty }) {
 
 // ─── Step 1: Pilih Tiket ──────────────────────────────────────
 function Step1({ wisata, qty, setQty, tanggal, setTanggal, onNext }) {
-    const today   = new Date().toISOString().split('T')[0];
+    const today   = getTodayString();
+    const harga   = getHargaByDate(wisata?.prices, tanggal);
     const canNext = wisata && tanggal && (qty.dewasa + qty.anak) > 0;
 
     const Counter = ({ label, subLabel, value, price, type }) => (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', border: `1.5px solid ${value > 0 ? 'var(--teal-300)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', background: value > 0 ? 'var(--teal-50)' : 'white', transition: 'all .2s' }}>
+        <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '20px 24px',
+            border: `1.5px solid ${value > 0 ? 'var(--teal-300)' : 'var(--border)'}`,
+            borderRadius: 'var(--radius-md)',
+            background: value > 0 ? 'var(--teal-50)' : 'white',
+            transition: 'all .2s',
+        }}>
             <div>
                 <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--dark)' }}>{label}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{subLabel}</div>
@@ -171,13 +216,13 @@ function Step1({ wisata, qty, setQty, tanggal, setTanggal, onNext }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <button
-                    onClick={() => setQty((q) => ({ ...q, [type]: Math.max(0, q[type] - 1) }))}
+                    onClick={() => setQty(q => ({ ...q, [type]: Math.max(0, q[type] - 1) }))}
                     disabled={value === 0}
                     style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid', borderColor: value > 0 ? 'var(--teal-500)' : 'var(--border)', background: 'white', color: value > 0 ? 'var(--teal-600)' : 'var(--text-muted)', fontSize: 18, cursor: value > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
                 >−</button>
                 <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--dark)', minWidth: 28, textAlign: 'center' }}>{value}</span>
                 <button
-                    onClick={() => setQty((q) => ({ ...q, [type]: q[type] + 1 }))}
+                    onClick={() => setQty(q => ({ ...q, [type]: q[type] + 1 }))}
                     style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid var(--teal-500)', background: 'var(--teal-600)', color: 'white', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
                 >+</button>
             </div>
@@ -186,35 +231,62 @@ function Step1({ wisata, qty, setQty, tanggal, setTanggal, onNext }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Pilih Tanggal */}
             <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 8 }}>
                     <i className="fas fa-calendar" style={{ color: 'var(--teal-500)', marginRight: 8 }} />Tanggal Kunjungan
                 </label>
-                <input type="date" min={today} value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="tiket-input" />
+                <input
+                    type="date"
+                    min={today}
+                    value={tanggal}
+                    onChange={e => setTanggal(e.target.value)}
+                    className="tiket-input"
+                />
+                {tanggal && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: isWeekend(tanggal) ? '#d97706' : '#16a34a', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <i className={`fas ${isWeekend(tanggal) ? 'fa-sun' : 'fa-briefcase'}`} />
+                        {isWeekend(tanggal) ? 'Weekend — harga akhir pekan berlaku' : 'Weekday — harga hari kerja berlaku'}
+                    </div>
+                )}
             </div>
+
+            {/* Jumlah Pengunjung */}
             <div>
                 <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 12 }}>
                     <i className="fas fa-users" style={{ color: 'var(--teal-500)', marginRight: 8 }} />Jumlah Pengunjung
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {wisata ? (
-                        <>
-                            <Counter label="Dewasa"    subLabel="Usia 13 tahun ke atas" price={wisata.harga_dewasa} value={qty.dewasa} type="dewasa" />
-                            <Counter label="Anak-anak" subLabel="Usia 3–12 tahun"       price={wisata.harga_anak}   value={qty.anak}   type="anak" />
-                        </>
-                    ) : (
-                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
-                            Pilih destinasi wisata terlebih dahulu
-                        </div>
-                    )}
-                </div>
+                {wisata ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <Counter
+                            label="Dewasa" subLabel="Usia 13 tahun ke atas"
+                            price={harga.harga_dewasa || 0}
+                            value={qty.dewasa} type="dewasa"
+                        />
+                        <Counter
+                            label="Anak-anak" subLabel="Usia 3–12 tahun"
+                            price={harga.harga_anak || 0}
+                            value={qty.anak} type="anak"
+                        />
+                    </div>
+                ) : (
+                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
+                        Data wisata tidak ditemukan
+                    </div>
+                )}
+                {!tanggal && (qty.dewasa + qty.anak) > 0 && (
+                    <div style={{ marginTop: 10, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 8, fontSize: 13, color: '#92400e', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <i className="fas fa-exclamation-triangle" /> Pilih tanggal kunjungan terlebih dahulu untuk melihat harga yang sesuai.
+                    </div>
+                )}
             </div>
-            {(qty.dewasa + qty.anak) > 0 && !tanggal && (
-                <div style={{ padding: '12px 16px', background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#92400e', display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <i className="fas fa-exclamation-triangle" /> Pilih tanggal kunjungan terlebih dahulu.
-                </div>
-            )}
-            <button onClick={onNext} disabled={!canNext} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: 16, opacity: canNext ? 1 : .5, cursor: canNext ? 'pointer' : 'not-allowed' }}>
+
+            <button
+                onClick={onNext}
+                disabled={!canNext}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: 16, opacity: canNext ? 1 : .5, cursor: canNext ? 'pointer' : 'not-allowed' }}
+            >
                 Lanjut ke Data Pengunjung <i className="fas fa-arrow-right" />
             </button>
         </div>
@@ -222,45 +294,140 @@ function Step1({ wisata, qty, setQty, tanggal, setTanggal, onNext }) {
 }
 
 // ─── Step 2: Data Pengunjung ──────────────────────────────────
-function Step2({ form, setForm, onNext, onBack }) {
-    const [errors, setErrors] = useState({});
-    const namaRef  = useRef();
-    const hpRef    = useRef();
-    const emailRef = useRef();
-    const kotaRef  = useRef();
+function Step2({ form, setForm, onNext, onBack, userProfile }) {
+    const [errors,     setErrors]     = useState({});
+    const [kecamatans, setKecamatans] = useState([]);
+    const [loadingKec, setLoadingKec] = useState(true);
+
+    const namaRef      = useRef();
+    const hpRef        = useRef();
+    const emailRef     = useRef();
+    const kecamatanRef = useRef();
+
+    // Fetch daftar kecamatan
+    useEffect(() => {
+        api.get('/kecamatan')
+            .then(res => {
+                const data = res.data?.data || res.data || [];
+                setKecamatans(data);
+            })
+            .catch(() => setKecamatans([]))
+            .finally(() => setLoadingKec(false));
+    }, []);
 
     const validate = () => {
-        const nama = namaRef.current.value.trim();
-        const hp   = hpRef.current.value.trim();
-        const e    = {};
+        const nama        = namaRef.current?.value.trim() || '';
+        const hp          = hpRef.current?.value.trim() || '';
+        const email       = emailRef.current?.value.trim() || '';
+        const kecamatanId = kecamatanRef.current?.value || '';
+        const e = {};
+
         if (!nama) e.nama = 'Nama wajib diisi';
         if (!hp)   e.hp   = 'Nomor HP wajib diisi';
-        else if (!/^0[0-9]{8,13}$/.test(hp.replace(/\s/g, ''))) e.hp = 'Format nomor HP tidak valid';
+        else if (!/^0[0-9]{8,13}$/.test(hp.replace(/\s/g, ''))) e.hp = 'Format nomor HP tidak valid (contoh: 08xxxxxxxxxx)';
+
         setErrors(e);
         if (Object.keys(e).length === 0) {
-            setForm({ nama, hp, email: emailRef.current.value.trim(), kota: kotaRef.current.value.trim() });
+            setForm({ nama, hp, email, kecamatan_id: kecamatanId });
             onNext();
         }
     };
 
-    const Field = ({ id, label, icon, type = 'text', placeholder, required, hint, inputRef, defaultValue }) => (
-        <div>
-            <label htmlFor={id} style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 6 }}>
-                <i className={`fas ${icon}`} style={{ color: 'var(--teal-500)', marginRight: 6 }} />
-                {label}{required && <span style={{ color: '#ef4444', marginLeft: 3 }}>*</span>}
-            </label>
-            <input id={id} type={type} placeholder={placeholder} ref={inputRef} defaultValue={defaultValue || ''} className={`tiket-input${errors[id] ? ' error' : ''}`} autoComplete={id === 'nama' ? 'name' : id === 'hp' ? 'tel' : id === 'email' ? 'email' : id === 'kota' ? 'address-level2' : 'off'} />
-            {errors[id] && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5 }}><i className="fas fa-exclamation-circle" /> {errors[id]}</div>}
-            {hint && !errors[id] && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{hint}</div>}
-        </div>
-    );
-
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <Field id="nama"  label="Nama Lengkap"    icon="fa-user"           placeholder="Masukkan nama lengkap Anda"  required inputRef={namaRef}  defaultValue={form.nama} />
-            <Field id="hp"    label="Nomor HP / WA"   icon="fa-phone"          placeholder="08xxxxxxxxxx"                required hint="Tiket akan dikirim ke nomor ini" inputRef={hpRef} defaultValue={form.hp} />
-            <Field id="email" label="Email"           icon="fa-envelope"       type="email" placeholder="nama@email.com" inputRef={emailRef} defaultValue={form.email} />
-            <Field id="kota"  label="Kota Asal"       icon="fa-map-marker-alt" placeholder="Contoh: Purwokerto"          inputRef={kotaRef}  defaultValue={form.kota} />
+
+            {/* Nama Lengkap */}
+            <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 6 }}>
+                    <i className="fas fa-user" style={{ color: 'var(--teal-500)', marginRight: 6 }} />
+                    Nama Lengkap <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                    ref={namaRef}
+                    type="text"
+                    placeholder="Masukkan nama lengkap Anda"
+                    defaultValue={form.nama || userProfile?.name || ''}
+                    className={`tiket-input${errors.nama ? ' error' : ''}`}
+                    autoComplete="name"
+                />
+                {errors.nama && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5 }}><i className="fas fa-exclamation-circle" /> {errors.nama}</div>}
+            </div>
+
+            {/* Nomor HP */}
+            <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 6 }}>
+                    <i className="fas fa-phone" style={{ color: 'var(--teal-500)', marginRight: 6 }} />
+                    Nomor HP / WA <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                    ref={hpRef}
+                    type="tel"
+                    placeholder="08xxxxxxxxxx"
+                    defaultValue={form.hp || userProfile?.no_hp || ''}
+                    className={`tiket-input${errors.hp ? ' error' : ''}`}
+                    autoComplete="tel"
+                />
+                {errors.hp
+                    ? <div style={{ fontSize: 12, color: '#ef4444', marginTop: 5 }}><i className="fas fa-exclamation-circle" /> {errors.hp}</div>
+                    : <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Tiket akan dikirim ke nomor ini</div>
+                }
+            </div>
+
+            {/* Email */}
+            <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 6 }}>
+                    <i className="fas fa-envelope" style={{ color: 'var(--teal-500)', marginRight: 6 }} />
+                    Email <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span>
+                </label>
+                <input
+                    ref={emailRef}
+                    type="email"
+                    placeholder="nama@email.com"
+                    defaultValue={form.email || userProfile?.email || ''}
+                    className="tiket-input"
+                    autoComplete="email"
+                />
+            </div>
+
+            {/* Kecamatan Asal — Dropdown */}
+            <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 6 }}>
+                    <i className="fas fa-map-marker-alt" style={{ color: 'var(--teal-500)', marginRight: 6 }} />
+                    Kecamatan Asal <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                    <select
+                        ref={kecamatanRef}
+                        defaultValue={form.kecamatan_id || userProfile?.kecamatan_id || ''}
+                        className="tiket-select"
+                        disabled={loadingKec}
+                    >
+                        <option value="">
+                            {loadingKec ? 'Memuat kecamatan...' : '— Pilih Kecamatan —'}
+                        </option>
+                        {kecamatans.map(k => (
+                            <option key={k.id} value={k.id}>{k.nama}</option>
+                        ))}
+                    </select>
+                    {loadingKec && (
+                        <div style={{ position: 'absolute', right: 44, top: '50%', transform: 'translateY(-50%)' }}>
+                            <i className="fas fa-spinner fa-spin" style={{ color: 'var(--teal-500)', fontSize: 13 }} />
+                        </div>
+                    )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Pilih kecamatan tempat tinggal Anda di Purbalingga
+                </div>
+            </div>
+
+            {/* Info autofill */}
+            {userProfile && (
+                <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 12, color: '#15803d', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <i className="fas fa-check-circle" />
+                    Data diisi otomatis dari profil akun Anda. Ubah jika perlu.
+                </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
                 <button onClick={onBack} className="btn btn-outline" style={{ flex: 1, justifyContent: 'center', padding: '14px' }}>
                     <i className="fas fa-arrow-left" /> Kembali
@@ -274,16 +441,18 @@ function Step2({ form, setForm, onNext, onBack }) {
 }
 
 // ─── Step 3: Pembayaran ───────────────────────────────────────
-function Step3({ wisata, qty, form, onNext, onBack }) {
-    const [metode,  setMetode]  = useState('qris');
+function Step3({ wisata, qty, form, tanggal, onNext, onBack }) {
+    const [metode,  setMetode]  = useState('smartpay');
     const [loading, setLoading] = useState(false);
-    const total = wisata ? qty.dewasa * wisata.harga_dewasa + qty.anak * wisata.harga_anak : 0;
 
-    const metodes = [
-        { key: 'qris',    label: 'QRIS',               icon: 'fa-qrcode',     tag: '✓ Direkomendasikan', tagColor: '#16a34a' },
-        { key: 'transfer',label: 'Transfer Bank',       icon: 'fa-university', tag: null },
-        { key: 'ewallet', label: 'GoPay / OVO / Dana',  icon: 'fa-wallet',     tag: null },
-    ];
+    const harga = getHargaByDate(wisata?.prices, tanggal);
+    const total = wisata
+        ? qty.dewasa * (harga.harga_dewasa || 0) + qty.anak * (harga.harga_anak || 0)
+        : 0;
+
+    const tglFormatted = tanggal
+        ? new Date(tanggal + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : '-';
 
     const handleBayar = () => {
         setLoading(true);
@@ -292,6 +461,7 @@ function Step3({ wisata, qty, form, onNext, onBack }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Ringkasan */}
             <div style={{ padding: 20, background: 'var(--teal-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--teal-100)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--teal-700)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Ringkasan Pemesanan</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -299,37 +469,48 @@ function Step3({ wisata, qty, form, onNext, onBack }) {
                     <span style={{ fontSize: 14, color: 'var(--text-dark)', fontWeight: 600 }}>{form.nama}</span>
                     <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>· {form.hp}</span>
                 </div>
-                {qty.dewasa > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}><span>Tiket Dewasa × {qty.dewasa}</span><span style={{ fontWeight: 600 }}>{formatRupiah(qty.dewasa * wisata.harga_dewasa)}</span></div>}
-                {qty.anak   > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}><span>Tiket Anak × {qty.anak}</span><span style={{ fontWeight: 600 }}>{formatRupiah(qty.anak * wisata.harga_anak)}</span></div>}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+                    <i className="fas fa-calendar" style={{ color: 'var(--teal-500)', width: 16 }} />
+                    {tglFormatted}
+                    <span style={{ padding: '1px 8px', borderRadius: 50, fontSize: 11, fontWeight: 600, background: isWeekend(tanggal) ? '#fef9c3' : '#dcfce7', color: isWeekend(tanggal) ? '#713f12' : '#15803d' }}>
+                        {isWeekend(tanggal) ? 'Weekend' : 'Weekday'}
+                    </span>
+                </div>
+                {qty.dewasa > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
+                        <span>Tiket Dewasa × {qty.dewasa}</span>
+                        <span style={{ fontWeight: 600 }}>{formatRupiah(qty.dewasa * (harga.harga_dewasa || 0))}</span>
+                    </div>
+                )}
+                {qty.anak > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
+                        <span>Tiket Anak × {qty.anak}</span>
+                        <span style={{ fontWeight: 600 }}>{formatRupiah(qty.anak * (harga.harga_anak || 0))}</span>
+                    </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 800, paddingTop: 12, borderTop: '1px dashed var(--teal-200)', marginTop: 4, color: 'var(--dark)' }}>
                     <span>Total Pembayaran</span>
                     <span style={{ color: 'var(--teal-700)' }}>{formatRupiah(total)}</span>
                 </div>
             </div>
 
+            {/* Metode Pembayaran */}
             <div>
                 <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-dark)', marginBottom: 12 }}>
                     <i className="fas fa-credit-card" style={{ color: 'var(--teal-500)', marginRight: 8 }} />Metode Pembayaran
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {metodes.map((m) => (
-                        <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', border: `2px solid ${metode === m.key ? 'var(--teal-500)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', cursor: 'pointer', background: metode === m.key ? 'var(--teal-50)' : 'white', transition: 'all .15s' }}>
-                            <input type="radio" name="metode" value={m.key} checked={metode === m.key} onChange={() => setMetode(m.key)} style={{ display: 'none' }} />
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: metode === m.key ? 'var(--teal-600)' : 'var(--teal-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
-                                <i className={`fas ${m.icon}`} style={{ color: metode === m.key ? 'white' : 'var(--teal-600)', fontSize: 15 }} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--dark)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    {m.label}
-                                    {m.tag && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 50, background: '#dcfce7', color: m.tagColor }}>{m.tag}</span>}
-                                </div>
-                                {metode === m.key && m.key === 'transfer' && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>BRI · BNI · Mandiri · BCA</div>}
-                                {metode === m.key && m.key === 'qris'     && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Scan QR dengan aplikasi apapun</div>}
-                            </div>
-                            {metode === m.key && <i className="fas fa-check-circle" style={{ color: 'var(--teal-500)', fontSize: 18, flexShrink: 0 }} />}
-                        </label>
-                    ))}
-                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', border: '2px solid var(--teal-500)', borderRadius: 'var(--radius-md)', cursor: 'pointer', background: 'var(--teal-50)', transition: 'all .15s' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--teal-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className="fas fa-qrcode" style={{ color: 'white', fontSize: 15 }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--dark)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            SMARTPAY
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 50, background: '#dcfce7', color: '#16a34a' }}>✓ Direkomendasikan</span>
+                        </div>
+                    </div>
+                    <i className="fas fa-check-circle" style={{ color: 'var(--teal-500)', fontSize: 18, flexShrink: 0 }} />
+                </label>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
@@ -337,102 +518,60 @@ function Step3({ wisata, qty, form, onNext, onBack }) {
                     <i className="fas fa-arrow-left" /> Kembali
                 </button>
                 <button onClick={handleBayar} disabled={loading} className="btn btn-primary" style={{ flex: 2, justifyContent: 'center', padding: '14px', fontSize: 15 }}>
-                    {loading ? <><i className="fas fa-spinner fa-spin" /> Memproses...</> : <><i className="fas fa-lock" /> Bayar {formatRupiah(total)}</>}
+                    {loading
+                        ? <><i className="fas fa-spinner fa-spin" /> Memproses...</>
+                        : <><i className="fas fa-lock" /> Bayar {formatRupiah(total)}</>
+                    }
                 </button>
             </div>
         </div>
     );
 }
 
-// ─── Step 4: Selesai — TANPA e-ticket, ganti info tata cara ──
+// ─── Step 4: Selesai ──────────────────────────────────────────
 function Step4({ wisata, qty, form, tanggal }) {
-    const total        = wisata ? qty.dewasa * wisata.harga_dewasa + qty.anak * wisata.harga_anak : 0;
+    const harga = getHargaByDate(wisata?.prices, tanggal);
+    const total = wisata
+        ? qty.dewasa * (harga.harga_dewasa || 0) + qty.anak * (harga.harga_anak || 0)
+        : 0;
     const tglFormatted = tanggal
         ? new Date(tanggal + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         : '-';
 
     const steps = [
-        {
-            icon: 'fa-mobile-alt',
-            color: 'var(--teal-600)',
-            bg: 'var(--teal-50)',
-            title: 'Buka Riwayat Tiket',
-            desc: 'Masuk ke halaman Riwayat Tiket di akun kamu untuk menemukan tiket yang baru saja dipesan.',
-        },
-        {
-            icon: 'fa-file-alt',
-            color: '#7c3aed',
-            bg: '#f5f3ff',
-            title: 'Tampilkan E-Ticket',
-            desc: 'Klik tiket wisata, lalu tekan tombol "Lihat E-Ticket" untuk membuka atau mengunduh tiket digital kamu.',
-        },
-        {
-            icon: 'fa-user-check',
-            color: '#d97706',
-            bg: '#fffbeb',
-            title: 'Tunjukkan ke Staff',
-            desc: 'Saat tiba di lokasi wisata, tunjukkan e-ticket kepada petugas di pintu masuk. E-ticket hanya berlaku sekali pakai.',
-        },
-        {
-            icon: 'fa-star',
-            color: '#16a34a',
-            bg: '#f0fdf4',
-            title: 'Beri Ulasan',
-            desc: 'Setelah berkunjung, staff akan memvalidasi tiket. Kamu akan mendapat notifikasi untuk memberikan ulasan wisata.',
-        },
+        { icon: 'fa-mobile-alt', color: 'var(--teal-600)', bg: 'var(--teal-50)', title: 'Buka Riwayat Tiket', desc: 'Masuk ke halaman Riwayat Tiket di akun kamu untuk menemukan tiket yang baru saja dipesan.' },
+        { icon: 'fa-file-alt', color: '#7c3aed', bg: '#f5f3ff', title: 'Tampilkan E-Ticket', desc: 'Klik tiket wisata, lalu tekan tombol "Lihat E-Ticket" untuk membuka atau mengunduh tiket digital kamu.' },
+        { icon: 'fa-user-check', color: '#d97706', bg: '#fffbeb', title: 'Tunjukkan ke Staff', desc: 'Saat tiba di lokasi wisata, tunjukkan e-ticket kepada petugas di pintu masuk. E-ticket hanya berlaku sekali pakai.' },
+        { icon: 'fa-star', color: '#16a34a', bg: '#f0fdf4', title: 'Beri Ulasan', desc: 'Setelah berkunjung, staff akan memvalidasi tiket. Kamu akan mendapat notifikasi untuk memberikan ulasan wisata.' },
     ];
 
     return (
         <div style={{ textAlign: 'center', padding: '8px 0' }}>
-
-            {/* ── Icon sukses ── */}
             <div className="success-icon" style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#16a34a,#15803d)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 0 0 10px rgba(22,163,74,.1), 0 0 0 20px rgba(22,163,74,.05)' }}>
                 <i className="fas fa-check" style={{ fontSize: 32, color: 'white' }} />
             </div>
-
             <div className="success-card">
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--dark)', marginBottom: 8 }}>
-                    Pembayaran Berhasil!
-                </h2>
-                <p style={{ fontSize: 15, color: 'var(--text-muted)', marginBottom: 8 }}>
-                    Tiket kamu sudah aktif dan siap digunakan.
-                </p>
-
-                {/* Mini booking info */}
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--dark)', marginBottom: 8 }}>Pembayaran Berhasil!</h2>
+                <p style={{ fontSize: 15, color: 'var(--text-muted)', marginBottom: 8 }}>Tiket kamu sudah aktif dan siap digunakan.</p>
                 <div style={{ display: 'inline-flex', gap: 20, background: 'var(--teal-50)', border: '1px solid var(--teal-100)', borderRadius: 'var(--radius-md)', padding: '12px 24px', margin: '0 auto 28px', fontSize: 13, color: 'var(--teal-700)', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <span><i className="fas fa-mountain" style={{ marginRight: 5 }} />{wisata?.nama}</span>
                     <span><i className="fas fa-calendar" style={{ marginRight: 5 }} />{tglFormatted}</span>
                     <span><i className="fas fa-users" style={{ marginRight: 5 }} />{qty.dewasa + qty.anak} orang</span>
-                    <span style={{ fontWeight: 700, color: 'var(--teal-700)' }}><i className="fas fa-money-bill-wave" style={{ marginRight: 5 }} />{formatRupiah(total)}</span>
+                    <span style={{ fontWeight: 700 }}><i className="fas fa-money-bill-wave" style={{ marginRight: 5 }} />{formatRupiah(total)}</span>
                 </div>
             </div>
 
-            {/* ── Tata cara penggunaan tiket ── */}
             <div className="success-steps" style={{ textAlign: 'left', marginBottom: 28 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
                     <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <i className="fas fa-info-circle" style={{ color: 'var(--teal-500)' }} />
-                        Cara Menggunakan Tiket
+                        <i className="fas fa-info-circle" style={{ color: 'var(--teal-500)' }} />Cara Menggunakan Tiket
                     </span>
                     <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
                 </div>
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {steps.map((s, i) => (
-                        <div
-                            key={i}
-                            className="step-card"
-                            style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 14,
-                                padding: '14px 18px',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius-md)',
-                                background: 'white',
-                                transition: 'all .2s',
-                            }}
-                        >
-                            {/* Nomor + ikon */}
+                        <div key={i} className="step-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'white', transition: 'all .2s' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                                 <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <i className={`fas ${s.icon}`} style={{ color: s.color, fontSize: 16 }} />
@@ -446,15 +585,12 @@ function Step4({ wisata, qty, form, tanggal }) {
                         </div>
                     ))}
                 </div>
-
-                {/* Catatan penting */}
                 <div style={{ marginTop: 14, padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#b91c1c', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <i className="fas fa-exclamation-triangle" style={{ marginTop: 1, flexShrink: 0 }} />
                     <span><strong>Perhatian:</strong> E-ticket hanya berlaku <strong>sekali pakai</strong>. Setelah divalidasi oleh staff, tiket tidak dapat digunakan kembali.</span>
                 </div>
             </div>
 
-            {/* ── Action buttons ── */}
             <div className="success-actions" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Link to="/riwayat" className="btn btn-primary" style={{ fontSize: 15, padding: '13px 28px' }}>
                     <i className="fas fa-ticket-alt" /> Lihat Riwayat Tiket
@@ -471,17 +607,79 @@ function Step4({ wisata, qty, form, tanggal }) {
 export default function Tiket() {
     const [searchParams] = useSearchParams();
     const wisataId = searchParams.get('id');
-    const wisata   = wisataId ? wisataData.find((w) => String(w.id) === wisataId) : wisataData[0];
+
+    const [wisata,      setWisata]      = useState(null);
+    const [userProfile, setUserProfile] = useState(null);
+    const [loading,     setLoading]     = useState(true);
+    const [notFound,    setNotFound]    = useState(false);
 
     const [step,    setStep]    = useState(1);
     const [tanggal, setTanggal] = useState('');
     const [qty,     setQty]     = useState({ dewasa: 1, anak: 0 });
     const [form,    setForm]    = useState({});
-    const [bookingId]           = useState(randomBookingId);
+
+    // Fetch wisata berdasarkan ID + profil user
+    useEffect(() => {
+        if (!wisataId) { setNotFound(true); setLoading(false); return; }
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [wisataRes, profileRes] = await Promise.allSettled([
+                    api.get(`/wisata/${wisataId}`),
+                    api.get('/auth/me'),      // endpoint profil user (pakai token sanctum)
+                ]);
+
+                if (wisataRes.status === 'fulfilled') {
+                    setWisata(wisataRes.value.data?.data || null);
+                } else {
+                    setNotFound(true);
+                }
+
+                if (profileRes.status === 'fulfilled') {
+                    setUserProfile(profileRes.value.data?.data || profileRes.value.data || null);
+                }
+                // Kalau profil gagal (belum login), biarkan null — form tetap kosong
+            } catch {
+                setNotFound(true);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [wisataId]);
+
+    // Loading state
+    if (loading) {
+        return (
+            <div style={{ paddingTop: 90, minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <i className="fas fa-spinner fa-spin" style={{ fontSize: 32, color: 'var(--teal-500)', marginBottom: 16 }} />
+                    <div>Memuat data wisata...</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (notFound || !wisata) {
+        return (
+            <div style={{ paddingTop: 90, minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <i className="fas fa-exclamation-triangle" style={{ fontSize: 48, color: '#f59e0b', marginBottom: 16 }} />
+                    <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--dark)', marginBottom: 8 }}>Wisata Tidak Ditemukan</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>Destinasi wisata yang Anda cari tidak tersedia.</p>
+                    <Link to="/wisata" className="btn btn-primary">
+                        <i className="fas fa-compass" /> Jelajahi Wisata Lainnya
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{ paddingTop: 90, paddingBottom: 80, background: 'var(--cream)', minHeight: '100vh' }}>
-            <InjectStyle />
+            <style>{STYLE}</style>
 
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, var(--teal-800), var(--teal-950))', padding: '40px 0 36px' }}>
@@ -489,9 +687,13 @@ export default function Tiket() {
                     <div style={{ fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--teal-300)', fontWeight: 600, marginBottom: 8 }}>
                         <i className="fas fa-ticket-alt" style={{ marginRight: 6 }} />Pembelian Tiket
                     </div>
-                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(24px,4vw,36px)', color: 'white', marginBottom: 0 }}>
-                        {wisata ? wisata.nama : 'Beli Tiket Wisata'}
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(24px,4vw,36px)', color: 'white', marginBottom: 4 }}>
+                        {wisata.nama}
                     </h1>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <i className="fas fa-map-marker-alt" />
+                        {wisata.alamat_lengkap || 'Purbalingga'}
+                    </div>
                 </div>
             </div>
 
@@ -508,15 +710,41 @@ export default function Tiket() {
                             {STEPS[step - 1].label}
                         </h2>
 
-                        {step === 1 && <Step1 wisata={wisata} qty={qty} setQty={setQty} tanggal={tanggal} setTanggal={setTanggal} onNext={() => setStep(2)} />}
-                        {step === 2 && <Step2 form={form} setForm={setForm} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-                        {step === 3 && <Step3 wisata={wisata} qty={qty} form={form} onNext={() => setStep(4)} onBack={() => setStep(2)} />}
-                        {step === 4 && <Step4 wisata={wisata} qty={qty} form={form} bookingId={bookingId} tanggal={tanggal} />}
+                        {step === 1 && (
+                            <Step1
+                                wisata={wisata}
+                                qty={qty} setQty={setQty}
+                                tanggal={tanggal} setTanggal={setTanggal}
+                                onNext={() => setStep(2)}
+                            />
+                        )}
+                        {step === 2 && (
+                            <Step2
+                                form={form} setForm={setForm}
+                                onNext={() => setStep(3)}
+                                onBack={() => setStep(1)}
+                                userProfile={userProfile}
+                            />
+                        )}
+                        {step === 3 && (
+                            <Step3
+                                wisata={wisata} qty={qty}
+                                form={form} tanggal={tanggal}
+                                onNext={() => setStep(4)}
+                                onBack={() => setStep(2)}
+                            />
+                        )}
+                        {step === 4 && (
+                            <Step4
+                                wisata={wisata} qty={qty}
+                                form={form} tanggal={tanggal}
+                            />
+                        )}
                     </div>
 
                     {/* Sidebar */}
                     <div>
-                        {step < 4 && <OrderSummary wisata={wisata} qty={qty} />}
+                        {step < 4 && <OrderSummary wisata={wisata} qty={qty} tanggal={tanggal} />}
                         {step === 4 && (
                             <div style={{ background: 'linear-gradient(135deg,var(--teal-600),var(--teal-800))', borderRadius: 'var(--radius-lg)', padding: 24, color: 'white' }}>
                                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 10 }}>

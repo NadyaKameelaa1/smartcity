@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import SuperAdminLayout from "./SuperAdminLayout";
 import api from "../../api/axios";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+
+// Fix default Leaflet icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSS
@@ -393,14 +405,22 @@ const css = `
 // ─────────────────────────────────────────────────────────────────────────────
 const PER_PAGE = 10;
 
-const STATUS_LIST = ["aktif", "nonaktif", "draft"];
+const STATUS_LIST = ["Aktif", "Nonaktif", "Draft"];
 
 const EMPTY_FORM = {
-  nama: "", kategori: "", deskripsi: "",
+  nama: "", slug: "", kategori: "", deskripsi: "",
   kecamatan_id: "", jam_buka: "", jam_tutup: "",
-  fasilitas: "", kontak: "", status: "draft",
-  thumbnail: null,
+  fasilitas: "", kontak: "", status: "Draft",
+  thumbnail: null, latitude: -7.3906, longitude: 109.3647,
+  prices: [
+    { day_type: "weekday", harga_anak: 0, harga_dewasa: 0 },
+    { day_type: "weekend", harga_anak: 0, harga_dewasa: 0 },
+  ],
 };
+
+const DAY_TYPES = ["weekday", "weekend", "holiday"];
+
+const KATEGORI_LIST = ['Alam', 'Rekreasi', 'Budaya', 'Kuliner', 'Religi', 'Edukasi'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: DescCell (truncate + toggle)
@@ -422,12 +442,23 @@ function DescCell({ text }) {
   );
 }
 
+function LocationMarker({ position, onMove }) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      onMove(parseFloat(lat.toFixed(7)), parseFloat(lng.toFixed(7)));
+    },
+  });
+  return position ? <Marker position={position} /> : null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function KelolaWisata() {
   const [wisataList, setWisataList] = useState([]);
   const [kecamatanList, setKecamatanList] = useState([]);
+  const [kategoriList, setKategoriList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -447,12 +478,14 @@ export default function KelolaWisata() {
 
   useEffect(() => { fetchAll(); }, []);
 
+
   const fetchAll = async () => {
     setLoading(true);
     try {
       const [wRes, kRes] = await Promise.all([
         api.get("/super-admin/wisata"),
         api.get("/super-admin/kecamatan"),
+        
       ]);
       setWisataList(wRes.data.data || wRes.data || []);
       setKecamatanList(kRes.data.data || kRes.data || []);
@@ -483,15 +516,15 @@ export default function KelolaWisata() {
 
   // Stats
   const total = wisataList.length;
-  const aktif = wisataList.filter((w) => w.status === "aktif").length;
-  const nonaktif = wisataList.filter((w) => w.status === "nonaktif").length;
-  const draft = wisataList.filter((w) => w.status === "draft").length;
+  const Aktif = wisataList.filter((w) => w.status === "Aktif").length;
+  const Nonaktif = wisataList.filter((w) => w.status === "Nonaktif").length;
+  const Draft = wisataList.filter((w) => w.status === "Draft").length;
 
   const stats = [
     { icon: "fa-solid fa-mountain-sun", label: "Total Wisata",    num: total,    color: "var(--teal-600)", bg: "var(--teal-50)" },
-    { icon: "fa-solid fa-circle-check", label: "Aktif",           num: aktif,    color: "#15803d",          bg: "#f0fdf4" },
-    { icon: "fa-solid fa-circle-xmark", label: "Nonaktif",        num: nonaktif, color: "#b91c1c",          bg: "#fef2f2" },
-    { icon: "fa-solid fa-file-pen",     label: "Draft",           num: draft,    color: "#92400e",          bg: "#fffbeb" },
+    { icon: "fa-solid fa-circle-check", label: "Aktif",           num: Aktif,    color: "#15803d",          bg: "#f0fdf4" },
+    { icon: "fa-solid fa-circle-xmark", label: "Nonaktif",        num: Nonaktif, color: "#b91c1c",          bg: "#fef2f2" },
+    { icon: "fa-solid fa-file-pen",     label: "Draft",           num: Draft,    color: "#92400e",          bg: "#fffbeb" },
   ];
 
   // ── Modal ──
@@ -507,6 +540,7 @@ export default function KelolaWisata() {
     setEditTarget(w);
     setForm({
       nama: w.nama || "",
+      slug: w.slug || "",
       kategori: w.kategori || "",
       deskripsi: w.deskripsi || "",
       kecamatan_id: w.kecamatan_id || "",
@@ -514,8 +548,21 @@ export default function KelolaWisata() {
       jam_tutup: w.jam_tutup || "",
       fasilitas: w.fasilitas || "",
       kontak: w.kontak || "",
-      status: w.status || "draft",
+      status: w.status || "Draft",
       thumbnail: null,
+      latitude: w.marker?.lat ?? -7.3906,
+      longitude: w.marker?.lng ?? 109.3647,
+      // Isi prices dari data yang ada (jika ada), jika tidak gunakan default
+      prices: w.prices?.length
+        ? w.prices.map(p => ({
+            day_type: p.day_type,
+            harga_anak: p.harga_anak ?? 0,
+            harga_dewasa: p.harga_dewasa ?? 0,
+          }))
+        : [
+            { day_type: "weekday", harga_anak: 0, harga_dewasa: 0 },
+            { day_type: "weekend", harga_anak: 0, harga_dewasa: 0 },
+          ],
     });
     setFormErr({});
     setPreviewUrl(w.thumbnail_url || w.gambar || null);
@@ -525,15 +572,46 @@ export default function KelolaWisata() {
   const closeModal = () => { setModalOpen(false); setEditTarget(null); setPreviewUrl(null); };
 
   const handleFormChange = (field, val) => {
-    setForm((f) => ({ ...f, [field]: val }));
-    setFormErr((e) => ({ ...e, [field]: "" }));
-  };
+  setForm((prev) => {
+    const updated = { ...prev, [field]: val };
+    if (field === "nama") {
+      const oldSlug = generateSlug(prev.nama || "");
+      const currentSlug = prev.slug;
+      if (!currentSlug || currentSlug === oldSlug) {
+        updated.slug = generateSlug(val);
+      }
+    }
+    return updated;
+  });
+  setFormErr((e) => ({ ...e, [field]: "" }));
+};
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     handleFormChange("thumbnail", file);
     setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handlePriceChange = (index, field, value) => {
+    const newPrices = [...form.prices];
+    newPrices[index][field] = field === 'day_type' ? value : Number(value);
+    setForm(prev => ({ ...prev, prices: newPrices }));
+  };
+
+  const addPriceRow = () => {
+    if (form.prices.length >= DAY_TYPES.length) return;
+    setForm(prev => ({
+      ...prev,
+      prices: [...prev.prices, { day_type: "weekday", harga_anak: 0, harga_dewasa: 0 }],
+    }));
+  };
+
+  const removePriceRow = (index) => {
+    setForm(prev => ({
+      ...prev,
+      prices: prev.prices.filter((_, i) => i !== index),
+    }));
   };
 
   const validate = () => {
@@ -550,21 +628,34 @@ export default function KelolaWisata() {
     setSubmitting(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (v !== null && v !== undefined) fd.append(k, v); });
+      Object.entries(form).forEach(([k, v]) => {
+        if (v === null || v === undefined) return;
+        if (k === 'prices') {
+          fd.append(k, JSON.stringify(v));   // kirim sebagai JSON string
+        } else {
+          fd.append(k, v);
+        }
+      });
 
       if (editTarget) {
-        fd.append("_method", "PUT");
-        await api.post(`/superadmin/wisata/${editTarget.id}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-        setWisataList((prev) => prev.map((w) => w.id === editTarget.id ? { ...w, ...form, thumbnail_url: previewUrl } : w));
-        showToast(`Wisata "${form.nama}" berhasil diperbarui.`);
+        await api.post(`/super-admin/wisata/${editTarget.id}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        const res = await api.post("/superadmin/wisata", fd, { headers: { "Content-Type": "multipart/form-data" } });
-        setWisataList((prev) => [res.data.data || res.data, ...prev]);
+        const res = await api.post("/super-admin/wisata", fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setWisataList(prev => [res.data.data || res.data, ...prev]);
         showToast(`Wisata "${form.nama}" berhasil ditambahkan.`);
       }
       closeModal();
     } catch (e) {
-      showToast(e.response?.data?.message || "Gagal menyimpan data.", "error");
+      const message =
+        e.response?.data?.message ||
+        (e.response?.data?.errors
+          ? Object.values(e.response.data.errors).flat().join(', ')
+          : 'Gagal menyimpan data.');
+      showToast(message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -573,7 +664,7 @@ export default function KelolaWisata() {
   const handleDelete = async () => {
     const w = confirmDel; setConfirmDel(null);
     try {
-      await api.delete(`/superadmin/wisata/${w.id}`);
+      await api.delete(`/super-admin/wisata/${w.id}`);
       setWisataList((prev) => prev.filter((x) => x.id !== w.id));
       showToast(`Wisata "${w.nama}" berhasil dihapus.`);
     } catch {
@@ -584,7 +675,7 @@ export default function KelolaWisata() {
   // Inline status update
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await api.patch(`/superadmin/wisata/${id}/status`, { status: newStatus });
+      await api.patch(`/super-admin/wisata/${id}/status`, { status: newStatus });
       setWisataList((prev) => prev.map((w) => w.id === id ? { ...w, status: newStatus } : w));
       showToast("Status berhasil diperbarui.");
     } catch {
@@ -592,9 +683,47 @@ export default function KelolaWisata() {
     }
   };
 
-  const statusClass = (s) => s === "aktif" ? "aktif" : s === "nonaktif" ? "nonaktif" : "draft";
+//   function LocationMarker({ position, onMove }) {
+//   useMapEvents({
+//     click(e) {
+//       const { lat, lng } = e.latlng;
+//       onMove(parseFloat(lat.toFixed(7)), parseFloat(lng.toFixed(7)));
+//     },
+//   });
+//   return position ? <Marker position={position} /> : null;
+// }
 
-  const kecamatanName = (id) => kecamatanList.find((k) => k.id == id)?.nama_kecamatan || "—";
+  const statusClass = (s) => s === "Aktif" ? "aktif" : s === "Nonaktif" ? "nonaktif" : "draft";
+
+  const kecamatanName = (id) => kecamatanList.find((k) => k.id == id)?.nama || "—";
+
+  const getCorrectImageUrl = (item) => {
+  // 1. Cek apakah sudah ada thumbnail_url dari Accessor Laravel
+  if (item.thumbnail_url) return item.thumbnail_url;
+  
+  let path = item.gambar || item.thumbnail;
+  if (!path) return null;
+
+  // 2. Jika path diawali dengan http, langsung kembalikan
+  if (path.startsWith("http")) return path;
+
+  // 3. Bersihkan path jika mengandung "/wisata/" atau "/" di awal
+  // Kita hanya butuh nama filenya saja atau path relatif setelah storage
+  const cleanPath = path.replace(/^\/?wisata\//, "").replace(/^\//, "");
+
+  // 4. Gabungkan dengan URL storage Laravel kamu
+  const baseUrl = "http://localhost:8000/storage/wisata"; // Sesuaikan folder simpanmu
+  return `${baseUrl}/${cleanPath}`;
+};
+
+const generateSlug = (name) => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -635,7 +764,7 @@ export default function KelolaWisata() {
             <input className="kw-search-input" type="text" placeholder="Cari nama wisata, kategori..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="kw-filter-tabs">
-            {["semua", "aktif", "nonaktif", "draft"].map((f) => (
+            {["semua", "Aktif", "Nonaktif", "Draft"].map((f) => (
               <button key={f} className={`kw-filter-tab${filterStatus === f ? " active" : ""}`} onClick={() => setFilterStatus(f)}>
                 {f === "semua" ? "Semua" : f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
@@ -696,10 +825,21 @@ export default function KelolaWisata() {
                     <tr key={w.id}>
                       <td><span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "monospace" }}>#{w.id}</span></td>
                       <td>
-                        {w.thumbnail_url || w.gambar
-                          ? <img src={w.thumbnail_url || w.gambar} alt={w.nama} className="kw-thumb" />
-                          : <div className="kw-thumb-placeholder"><i className="fa-solid fa-image" /></div>
-                        }
+                        {getCorrectImageUrl(w) ? (
+                          <img 
+                            src={getCorrectImageUrl(w)} 
+                            alt={w.nama} 
+                            className="kw-thumb" 
+                            onError={(e) => {
+                              // Fallback jika gambar tetap tidak ditemukan
+                              e.target.src = "https://via.placeholder.com/150?text=No+Image";
+                            }}
+                          />
+                        ) : (
+                          <div className="kw-thumb-placeholder">
+                            <i className="fa-solid fa-image" />
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontWeight: 700, minWidth: 150 }}>{w.nama}</td>
                       <td><span className="kw-kategori"><i className="fa-solid fa-tag" style={{ fontSize: 9 }} />{w.kategori || "—"}</span></td>
@@ -721,7 +861,7 @@ export default function KelolaWisata() {
                       <td>
                         <select
                           className={`kw-status-select ${statusClass(w.status)}`}
-                          value={w.status || "draft"}
+                          value={w.status || "Draft"}
                           onChange={(e) => handleStatusChange(w.id, e.target.value)}
                         >
                           {STATUS_LIST.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
@@ -784,10 +924,40 @@ export default function KelolaWisata() {
                 </div>
                 <div className="kw-field">
                   <label className="kw-label"><i className="fa-solid fa-tag" /> Kategori <span className="kw-required">*</span></label>
-                  <input className={`kw-input${formErr.kategori ? " error" : ""}`} placeholder="cth: Alam, Sejarah, Buatan..." value={form.kategori} onChange={(e) => handleFormChange("kategori", e.target.value)} />
+                  <select
+                    className={`kw-select${formErr.kategori ? " error" : ""}`}
+                    value={form.kategori}
+                    onChange={(e) => handleFormChange("kategori", e.target.value)}
+                  >
+                    <option value="">— Pilih Kategori —</option>
+                    {KATEGORI_LIST.map((kat) => (
+                      <option key={kat} value={kat}>{kat}</option>
+                    ))}
+                  </select>
                   {formErr.kategori && <span className="kw-error-msg"><i className="fa-solid fa-circle-exclamation" />{formErr.kategori}</span>}
                 </div>
               </div>
+
+              <div className="kw-field-row">
+              <div className="kw-field">
+                <label className="kw-label"><i className="fa-solid fa-mountain-sun" /> Nama Wisata <span className="kw-required">*</span></label>
+                <input className={`kw-input${formErr.nama ? " error" : ""}`} placeholder="Nama destinasi wisata" value={form.nama} onChange={(e) => handleFormChange("nama", e.target.value)} />
+                {formErr.nama && <span className="kw-error-msg"><i className="fa-solid fa-circle-exclamation" />{formErr.nama}</span>}
+              </div>
+              <div className="kw-field">
+                <label className="kw-label"><i className="fa-solid fa-link" /> Slug URL</label>
+                <input
+                  className="kw-input"
+                  placeholder="slug-url-otomatis"
+                  value={form.slug}
+                  onChange={(e) => handleFormChange("slug", e.target.value)}
+                />
+                <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  <i className="fa-solid fa-circle-info" style={{ marginRight: 4, color: "var(--teal-400)" }} />
+                  Ubah manual hanya jika diperlukan. Huruf kecil, angka, dan strip (-).
+                </span>
+              </div>
+            </div>
 
               <div className="kw-field">
                 <label className="kw-label"><i className="fa-solid fa-align-left" /> Deskripsi</label>
@@ -802,7 +972,7 @@ export default function KelolaWisata() {
                   <label className="kw-label"><i className="fa-solid fa-location-dot" /> Kecamatan <span className="kw-required">*</span></label>
                   <select className={`kw-select${formErr.kecamatan_id ? " error" : ""}`} value={form.kecamatan_id} onChange={(e) => handleFormChange("kecamatan_id", e.target.value)}>
                     <option value="">— Pilih Kecamatan —</option>
-                    {kecamatanList.map((k) => <option key={k.id} value={k.id}>{k.nama_kecamatan}</option>)}
+                    {kecamatanList.map((k) => <option key={k.id} value={k.id}>{k.nama}</option>)}
                   </select>
                   {formErr.kecamatan_id && <span className="kw-error-msg"><i className="fa-solid fa-circle-exclamation" />{formErr.kecamatan_id}</span>}
                 </div>
@@ -828,6 +998,65 @@ export default function KelolaWisata() {
               <div className="kw-modal-divider" />
               <div className="kw-modal-section-label">Detail & Kontak</div>
 
+              <div className="kw-modal-divider" />
+              <div className="kw-modal-section-label">Lokasi di Peta</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: -8, marginBottom: 4 }}>
+                <i className="fa-solid fa-hand-pointer" style={{ color: "var(--teal-500)", marginRight: 6 }} />
+                Klik di peta untuk menentukan titik lokasi wisata secara presisi.
+              </div>
+
+              <div style={{ borderRadius: 12, overflow: 'hidden', border: '1.5px solid var(--border)', height: 260 }}>
+                <MapContainer
+                  center={[form.latitude || -7.3906, form.longitude || 109.3647]}
+                  zoom={13}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <LocationMarker
+                    position={[form.latitude, form.longitude]}
+                    onMove={(lat, lng) => {
+                      handleFormChange("latitude", lat);
+                      handleFormChange("longitude", lng);
+                    }}
+                  />
+                </MapContainer>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <div className="kw-coord-badge" style={{ padding: '5px 12px', borderRadius: 8, background: 'var(--teal-50)', border: '1px solid var(--teal-100)', fontFamily: 'monospace', fontSize: 12 }}>
+                  <i className="fa-solid fa-up-down" style={{ marginRight: 5, color: 'var(--teal-400)' }} />
+                  Lat: {form.latitude?.toFixed(6)}
+                </div>
+                <div className="kw-coord-badge" style={{ padding: '5px 12px', borderRadius: 8, background: 'var(--teal-50)', border: '1px solid var(--teal-100)', fontFamily: 'monospace', fontSize: 12 }}>
+                  <i className="fa-solid fa-left-right" style={{ marginRight: 5, color: 'var(--teal-400)' }} />
+                  Lng: {form.longitude?.toFixed(6)}
+                </div>
+              </div>
+
+              <div className="kw-field-row" style={{ marginTop: 8 }}>
+                <div className="kw-field">
+                  <label className="kw-label">Latitude</label>
+                  <input
+                    type="number"
+                    className="kw-input"
+                    step="0.0000001"
+                    value={form.latitude}
+                    onChange={(e) => handleFormChange("latitude", parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="kw-field">
+                  <label className="kw-label">Longitude</label>
+                  <input
+                    type="number"
+                    className="kw-input"
+                    step="0.0000001"
+                    value={form.longitude}
+                    onChange={(e) => handleFormChange("longitude", parseFloat(e.target.value))}
+                  />
+                </div>
+              </div>
+
               <div className="kw-field-row">
                 <div className="kw-field">
                   <label className="kw-label"><i className="fa-solid fa-list-check" /> Fasilitas</label>
@@ -837,6 +1066,68 @@ export default function KelolaWisata() {
                   <label className="kw-label"><i className="fa-solid fa-phone" /> Kontak</label>
                   <textarea className="kw-textarea" placeholder="Nomor telepon / WhatsApp..." value={form.kontak} onChange={(e) => handleFormChange("kontak", e.target.value)} rows={3} />
                 </div>
+              </div>
+
+              <div className="kw-modal-divider" />
+              <div className="kw-modal-section-label">Harga Tiket</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {form.prices.map((price, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div className="kw-field" style={{ flex: 1 }}>
+                      <label className="kw-label">Tipe Hari</label>
+                      <select
+                        className="kw-select"
+                        value={price.day_type}
+                        onChange={e => handlePriceChange(idx, 'day_type', e.target.value)}
+                      >
+                        {DAY_TYPES.map(dt => (
+                          <option key={dt} value={dt}>{dt.charAt(0).toUpperCase() + dt.slice(1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="kw-field" style={{ flex: 1 }}>
+                      <label className="kw-label">Harga Anak (Rp)</label>
+                      <input
+                        type="number"
+                        className="kw-input"
+                        min="0"
+                        value={price.harga_anak}
+                        onChange={e => handlePriceChange(idx, 'harga_anak', e.target.value)}
+                      />
+                    </div>
+                    <div className="kw-field" style={{ flex: 1 }}>
+                      <label className="kw-label">Harga Dewasa (Rp)</label>
+                      <input
+                        type="number"
+                        className="kw-input"
+                        min="0"
+                        value={price.harga_dewasa}
+                        onChange={e => handlePriceChange(idx, 'harga_dewasa', e.target.value)}
+                      />
+                    </div>
+                    {form.prices.length > 1 && (
+                      <button
+                        type="button"
+                        className="kw-modal-close"
+                        style={{ alignSelf: 'center', marginTop: 20, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                        onClick={() => removePriceRow(idx)}
+                        title="Hapus harga ini"
+                      >
+                        <i className="fa-solid fa-trash" style={{ color: '#b91c1c' }} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {form.prices.length < DAY_TYPES.length && (
+                  <button
+                    type="button"
+                    className="kw-add-btn"
+                    style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                    onClick={addPriceRow}
+                  >
+                    <i className="fa-solid fa-plus" /> Tambah Tipe Hari
+                  </button>
+                )}
               </div>
 
               <div className="kw-modal-divider" />

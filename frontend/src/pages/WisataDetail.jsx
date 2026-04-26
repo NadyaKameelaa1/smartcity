@@ -15,7 +15,7 @@ const formatJam = (jam) => {
     return jam.substring(0, 5).replace(':', '.');
 };
 
-const BASE_IMAGE_URL = 'http://192.168.40.128:8000/storage/';
+const BASE_IMAGE_URL = 'http://localhost:8000/storage/';
 
 export default function WisataDetail() {
     const { slug }   = useParams();
@@ -520,11 +520,11 @@ export default function WisataDetail() {
                                         <div className="wd-ticket__price-val">Harga belum tersedia</div>
                                     )}
                                 </div>
-                                <Link to={`/tiket?id=${w.id}`} className="wd-btn-primary">
+                                <Link to={`/tiket?id=${w.slug}`} className="wd-btn-primary">
                                     <i className="fas fa-shopping-cart" /> Beli Tiket Sekarang
                                 </Link>
-                                <Link 
-                                    to={`/peta?nama=${encodeURIComponent(w.nama)}&lat=${w.marker?.lat}&lng=${w.marker?.lng}`} 
+                                <Link
+                                    to={`/peta?nama=${encodeURIComponent(w.nama)}&lat=${w.marker?.lat ?? w.lat}&lng=${w.marker?.lng ?? w.lng}&open=1`}
                                     className="wd-btn-ghost"
                                 >
                                     <i className="fas fa-map-marked-alt" /> Lihat di Peta

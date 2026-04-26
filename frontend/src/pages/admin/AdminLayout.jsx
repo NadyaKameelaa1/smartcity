@@ -1,17 +1,48 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
- 
-export default function AdminLayout({ children, user }) {
+import api from "../../api/axios"; // ← tambahkan import ini
+
+export default function AdminLayout({ children }) { // ← hapus "user" dari parameter
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(new Date());
- 
+
+  // Ambil data user dari localStorage
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("admin_user")) || null;
+    } catch {
+      return null;
+    }
+  });
+
+   useEffect(() => {
+    const token = localStorage.getItem("admin_token");
+    if (!token && location.pathname !== "/admin/login") {
+      navigate("/admin/login", { replace: true });
+    }
+  }, []);
+
+
   // Clock tick every second
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+  // Fungsi logout
+  const handleLogout = async () => {
+    try {
+      await api.post("/admin/logout");
+    } catch (_) {
+      // abaikan error, tetap logout
+    } finally {
+      localStorage.removeItem("admin_token");
+      localStorage.removeItem("admin_user");
+      navigate("/admin/login");
+    }
+  };
+
  
   // Format tanggal WIB
   const formattedDate = now.toLocaleDateString("id-ID", {
@@ -43,6 +74,12 @@ export default function AdminLayout({ children, user }) {
       label: "Kelola Tiket",
       icon: "fa-solid fa-ticket",
       path: "/admin/kelola-tiket",
+    },
+    {
+      key: "scan",
+      label: "Scan Tiket",
+      icon: "fa-solid fa-ticket",
+      path: "/admin/scan-tiket",
     },
   ];
  
@@ -471,13 +508,13 @@ export default function AdminLayout({ children, user }) {
           {/* Footer / Logout */}
           <div className="adm-sidebar-footer">
             <button
-              className="adm-logout-btn"
-              onClick={() => navigate("/admin/login")}
-              title={collapsed ? "Keluar" : undefined}
-            >
-              <i className="fa-solid fa-right-from-bracket" />
-              <span>Keluar</span>
-            </button>
+            className="adm-logout-btn"
+            onClick={handleLogout}  // ← ganti dari navigate("/admin/login")
+            title={collapsed ? "Keluar" : undefined}
+          >
+            <i className="fa-solid fa-right-from-bracket" />
+            <span>Keluar</span>
+          </button>
           </div>
         </aside>
 

@@ -362,6 +362,17 @@ const STATUS_CONFIG = {
   selesai:   { label: "Selesai",   cls: "selesai"   },
 };
 
+// ─── Kategori ENUM dari database
+const KATEGORI_LIST = [
+  "Budaya",
+  "Olahraga",
+  "Pemerintahan",
+  "Pariwisata",
+  "Pendidikan",
+  "Hiburan",
+  "Lainnya",
+];
+
 const EMPTY_FORM = {
   nama:             "",
   kategori:         "",
@@ -419,8 +430,8 @@ export default function KelolaEvent() {
     setLoading(true);
     try {
       const [eRes, kRes] = await Promise.all([
-        api.get("/superadmin/event"),
-        api.get("/superadmin/kecamatan"),
+        api.get("/super-admin/event"),
+        api.get("/super-admin/kecamatan"),
       ]);
       setEventList(eRes.data.data || eRes.data || []);
       setKecamatanList(kRes.data.data || kRes.data || []);
@@ -469,7 +480,7 @@ export default function KelolaEvent() {
 
   // ── Kecamatan name lookup ──
   const kecamatanName = (id) =>
-    kecamatanList.find((k) => k.id == id)?.nama_kecamatan || "—";
+    kecamatanList.find((k) => k.id == id)?.nama|| "—";
 
   // ── Modal ──
   const openAdd = () => {
@@ -542,7 +553,7 @@ export default function KelolaEvent() {
 
       if (editTarget) {
         fd.append("_method", "PUT");
-        await api.post(`/superadmin/event/${editTarget.id}`, fd, {
+        await api.post(`/super-admin/event/${editTarget.id}`, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setEventList((prev) =>
@@ -554,7 +565,7 @@ export default function KelolaEvent() {
         );
         showToast(`Event "${form.nama}" berhasil diperbarui.`);
       } else {
-        const res = await api.post("/superadmin/event", fd, {
+        const res = await api.post("/super-admin/event", fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setEventList((prev) => [res.data.data || res.data, ...prev]);
@@ -573,7 +584,7 @@ export default function KelolaEvent() {
     const ev = confirmDel;
     setConfirmDel(null);
     try {
-      await api.delete(`/superadmin/event/${ev.id}`);
+      await api.delete(`/super-admin/event/${ev.id}`);
       setEventList((prev) => prev.filter((e) => e.id !== ev.id));
       showToast(`Event "${ev.nama}" berhasil dihapus.`);
     } catch {
@@ -584,7 +595,7 @@ export default function KelolaEvent() {
   // ── Inline status update ──
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await api.patch(`/superadmin/event/${id}/status`, { status: newStatus });
+      await api.patch(`/super-admin/event/${id}/status`, { status: newStatus });
       setEventList((prev) =>
         prev.map((ev) => (ev.id === id ? { ...ev, status: newStatus } : ev))
       );
@@ -592,6 +603,25 @@ export default function KelolaEvent() {
     } catch {
       showToast("Gagal mengubah status.", "error");
     }
+  };
+
+  const getCorrectImageUrl = (item) => {
+    // 1. Cek apakah sudah ada thumbnail_url dari Accessor Laravel
+    if (item.thumbnail_url) return item.thumbnail_url;
+    
+    let path = item.gambar || item.thumbnail;
+    if (!path) return null;
+
+    // 2. Jika path diawali dengan http, langsung kembalikan
+    if (path.startsWith("http")) return path;
+
+    // 3. Bersihkan path jika mengandung "/wisata/" atau "/" di awal
+    // Kita hanya butuh nama filenya saja atau path relatif setelah storage
+    const cleanPath = path.replace(/^\/?wisata\//, "").replace(/^\//, "");
+
+    // 4. Gabungkan dengan URL storage Laravel kamu
+    const baseUrl = "http://localhost:8000/storage/event"; // Sesuaikan folder simpanmu
+    return `${baseUrl}/${cleanPath}`;
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -731,14 +761,18 @@ export default function KelolaEvent() {
 
                         {/* Thumbnail */}
                         <td>
-                          {ev.thumbnail_url || ev.gambar ? (
-                            <img
-                              src={ev.thumbnail_url || ev.gambar}
-                              alt={ev.nama}
-                              className="ke-thumb"
+                          {getCorrectImageUrl(ev) ? (
+                            <img 
+                              src={getCorrectImageUrl(ev)} 
+                              alt={ev.nama} 
+                              className="kw-thumb" 
+                              onError={(e) => {
+                                // Fallback jika gambar tetap tidak ditemukan
+                                e.target.src = "https://via.placeholder.com/150?text=No+Image";
+                              }}
                             />
                           ) : (
-                            <div className="ke-thumb-placeholder">
+                            <div className="kw-thumb-placeholder">
                               <i className="fa-solid fa-image" />
                             </div>
                           )}
@@ -918,17 +952,21 @@ export default function KelolaEvent() {
 
               <div className="ke-field">
                 <label className="ke-label">
-                  <i className="fa-solid fa-calendar-days" /> Nama Event <span className="ke-required">*</span>
+                  <i className="fa-solid fa-tag" /> Kategori <span className="ke-required">*</span>
                 </label>
-                <input
-                  className={`ke-input${formErr.nama ? " error" : ""}`}
-                  placeholder="Nama event..."
-                  value={form.nama}
-                  onChange={(e) => handleFormChange("nama", e.target.value)}
-                />
-                {formErr.nama && (
+                <select
+                  className={`ke-select${formErr.kategori ? " error" : ""}`}
+                  value={form.kategori}
+                  onChange={(e) => handleFormChange("kategori", e.target.value)}
+                >
+                  <option value="">— Pilih Kategori —</option>
+                  {KATEGORI_LIST.map((kat) => (
+                    <option key={kat} value={kat}>{kat}</option>
+                  ))}
+                </select>
+                {formErr.kategori && (
                   <span className="ke-error-msg">
-                    <i className="fa-solid fa-circle-exclamation" />{formErr.nama}
+                    <i className="fa-solid fa-circle-exclamation" />{formErr.kategori}
                   </span>
                 )}
               </div>
@@ -936,17 +974,17 @@ export default function KelolaEvent() {
               <div className="ke-field-row">
                 <div className="ke-field">
                   <label className="ke-label">
-                    <i className="fa-solid fa-tag" /> Kategori <span className="ke-required">*</span>
+                    <i className="fa-solid fa-tag" /> Nama Event <span className="ke-required">*</span>
                   </label>
                   <input
-                    className={`ke-input${formErr.kategori ? " error" : ""}`}
-                    placeholder="cth: Festival, Olahraga, Budaya..."
-                    value={form.kategori}
-                    onChange={(e) => handleFormChange("kategori", e.target.value)}
+                    className={`ke-input${formErr.nama ? " error" : ""}`}
+                    placeholder="Nama event..."
+                    value={form.nama}
+                    onChange={(e) => handleFormChange("nama", e.target.value)}
                   />
-                  {formErr.kategori && (
+                  {formErr.nama && (
                     <span className="ke-error-msg">
-                      <i className="fa-solid fa-circle-exclamation" />{formErr.kategori}
+                      <i className="fa-solid fa-circle-exclamation" />{formErr.nama}
                     </span>
                   )}
                 </div>
@@ -1063,7 +1101,7 @@ export default function KelolaEvent() {
                   >
                     <option value="">— Pilih Kecamatan —</option>
                     {kecamatanList.map((k) => (
-                      <option key={k.id} value={k.id}>{k.nama_kecamatan}</option>
+                      <option key={k.id} value={k.id}>{k.nama}</option>
                     ))}
                   </select>
                   {formErr.kecamatan_id && (

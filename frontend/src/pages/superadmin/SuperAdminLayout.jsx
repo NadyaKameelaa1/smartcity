@@ -274,13 +274,7 @@ const NAV_GROUPS = [
       { icon: "fa-solid fa-bullhorn", label: "Pengumuman", path: "/super-admin/pengumuman" },
       { icon: "fa-solid fa-calendar", label: "Event", path: "/super-admin/event" },
       { icon: "fa-solid fa-building", label: "Bangunan", path: "/super-admin/bangunan" },
-    ],
-  },
-  {
-    label: "Sistem",
-    items: [
-      { icon: "fa-solid fa-chart-bar", label: "Statistik", path: "/super-admin/statistik" },
-      { icon: "fa-solid fa-gear", label: "Pengaturan", path: "/super-admin/pengaturan" },
+      { icon: "fa-solid fa-camera", label: "CCTV", path: "/super-admin/cctv" },
     ],
   },
 ];
@@ -375,14 +369,6 @@ export default function SuperAdminLayout({ children, user }) {
                 <div className="sa-user-role">Super Administrator</div>
               </div>
             </div>
-            <button
-              className="sa-logout-btn"
-              onClick={() => navigate("/superadmin/login")}
-              title={collapsed ? "Keluar" : undefined}
-            >
-              <i className="fa-solid fa-right-from-bracket" />
-              <span>Keluar</span>
-            </button>
           </div>
         </aside>
 

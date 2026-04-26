@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { useEffect } from 'react';
 import Navbar    from './components/Navbar';
 import Footer    from './components/Footer';
@@ -39,6 +39,9 @@ import KelolaBerita from './pages/superadmin/KelolaBerita';
 import KelolaPengumuman from './pages/superadmin/KelolaPengumuman';
 import KelolaEvent from './pages/superadmin/KelolaEvent';
 import KelolaBangunan from './pages/superadmin/KelolaBangunan';
+import KelolaCCTV from './pages/superadmin/KelolaCCTV';
+import ScanTiket from './pages/admin/ScanTiket';
+import SsoCallback from './pages/SsoCallback';
 
 // Scroll ke atas setiap ganti halaman
 function ScrollToTop() {
@@ -57,9 +60,11 @@ const FULLSCREEN_PAGES = [
     '/admin/informasi-wisata', 
     '/admin/login', 
     '/admin/kelola-tiket', 
+    '/admin/scan-tiket',
     '/super-admin/login', 
     '/super-admin/dashboard', 
     '/super-admin', 
+    '/super-admin/',
     '/super-admin/akun', 
     '/super-admin/wisata', 
     '/super-admin/berita',
@@ -67,12 +72,22 @@ const FULLSCREEN_PAGES = [
     '/super-admin/event',
     '/super-admin/pengaturan',
     '/super-admin/statistik',
-    '/super-admin/bangunan'];
+    '/super-admin/bangunan',
+    '/super-admin/cctv',
+    ];
 
 function Layout() {
     const { pathname } = useLocation();
     const isFullscreen = FULLSCREEN_PAGES.includes(pathname);
 
+    function ProtectedAdminRoute() {
+        const token = localStorage.getItem("admin_token");
+        if (!token) {
+            return <Navigate to="/admin/login" replace />;
+        }
+        return <Outlet />;
+    }
+    
     return (
         <>
             <ScrollToTop />
@@ -83,6 +98,8 @@ function Layout() {
                 <Routes>
                     <Route path="/login"                  element={<Login />} />
                     <Route path="/daftar"                  element={<Daftar />} />
+
+                    <Route path="/sso-callback" element={<SsoCallback />} />
 
                     <Route path="/"                  element={<Home />} />
                     <Route path="/wisata"              element={<Wisata />} />
@@ -113,22 +130,22 @@ function Layout() {
                     {/* Admin */}
 
                     <Route path="/admin/*" element={<InformasiWisata />} />
-                    <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/admin/kelola-tiket" element={<KelolaTiket />} />
+                    <Route path="/admin/scan-tiket" element={<ScanTiket />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
 
                     {/* -------------------------------------------------------------- */}
                     {/* Super Admin */}
 
                     <Route path="/super-admin/login" element={<SuperAdminLogin />} />
-                    <Route path="/super-admin" element={<SuperAdminLayout />} />
+                    <Route path="/super-admin" element={<KelolaAkun />} />
                     <Route path="/super-admin/akun" element={<KelolaAkun />} />
                     <Route path="/super-admin/wisata" element={<KelolaWisata />} />
                     <Route path="/super-admin/berita" element={<KelolaBerita />} />
-
-                    {/* Buatin ini : */}
                     <Route path="/super-admin/pengumuman" element={<KelolaPengumuman />} />
                     <Route path="/super-admin/event" element={<KelolaEvent />} />
                     <Route path="/super-admin/bangunan" element={<KelolaBangunan />} />
+                    <Route path="/super-admin/cctv" element={<KelolaCCTV />} />
                     
 
                     {/* -------------------------------------------------------------- */}

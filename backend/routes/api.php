@@ -1,6 +1,5 @@
 <?php
 
-// use Illuminate\Http\Request;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BeritaController;
@@ -13,19 +12,33 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\KecamatanController;
 use App\Http\Controllers\Api\PelayananController;
 use App\Http\Controllers\Api\PengumumanController;
+use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\StatistikController;
+use App\Http\Controllers\Api\TicketOrderController;
 use App\Http\Controllers\Api\WisataController;
+// use App\Models\User;
+use App\Models\Wisata;
+use Illuminate\Http\Request;
+// use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+// use Laravel\Socialite\Facades\Socialite;
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login',    [AuthController::class, 'login']);
  
-    // Perlu token
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me',      [AuthController::class, 'me']);
     });
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/tiket',        [TicketOrderController::class, 'index']);
+    Route::get('/tiket/{kodeOrder}', [TicketOrderController::class, 'show']);
+
+    Route::post('/wisata/{wisata_id}/rating',       [RatingController::class, 'store']);
+    Route::get('/wisata/{wisata_id}/rating/saya',   [RatingController::class, 'mySingleRating']);
 });
 
 Route::get('/wisata', [WisataController::class, 'index']);
@@ -47,31 +60,111 @@ Route::get('/building-categories', [BuildingCategoriesController::class, 'index'
 
 Route::get('/building-groups', [BuildingGroupsController::class, 'index']);
 
-// -------------------------------------------------------------------------
 
-Route::prefix('super-admin')->group(function () {
-    Route::get('/wisata', [WisataController::class, 'index']);
-    Route::get('/kecamatan', [KecamatanController::class, 'index']);
 
-    Route::get('/desa', [DesaController::class, 'index']);
+Route::get('/kecamatan', [KecamatanController::class, 'index']);
 
-    Route::get('/pengumuman', [PengumumanController::class, 'index']);
 
-    Route::get('/berita', [BeritaController::class, 'index']);
+    // ── Admin Wisata Auth ──────────────────────────────────
+    Route::prefix('admin')->group(function () {
+        Route::post('/login',  [AdminController::class, 'login']);
 
-    Route::get('/event', [EventController::class, 'index']);
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('/logout', [AdminController::class, 'logout']);
+            Route::get('/me',      [AdminController::class, 'me']);
+            Route::get('/wisata', function (Request $request) {
+                $user = $request->user();
+                if ($user->role !== 'admin') {
+                    return response()->json(['message' => 'Forbidden'], 403);
+                }
+                $wisata = Wisata::find($user->wisata_id);
+                return response()->json(['data' => $wisata]);
+            });
 
-    Route::get('/akun', [AdminController::class, 'index']);
+            Route::get('/tiket', [TicketOrderController::class, 'adminIndex']);
+    
+            Route::patch('/tiket/{kode_order}/gunakan', [TicketOrderController::class, 'gunakan']);
+            Route::get('/tiket/{kode_order}', [TicketOrderController::class, 'cekTiket']);
 
-    Route::get('/cctv', [CCTVController::class, 'index']);
+        });
+    });
+    Route::prefix('super-admin')->group(function () {
+        Route::get('/admin-akun', [WisataController::class, 'adminAKun']);
 
-    Route::get('/buildings', [BuildingController::class, 'index']);
-    Route::post('/buildings', [BuildingController::class, 'store']);
-    Route::post('/buildings/{id}', [BuildingController::class, 'update']);
-    Route::patch('/buildings/{id}/status',[BuildingController::class, 'updateStatus']);
-    Route::delete('/buildings/{id}',      [BuildingController::class, 'destroy']);
+        Route::get('/wisata', [WisataController::class, 'adminIndex']);
+        Route::post('/wisata', [WisataController::class, 'store']);
+        Route::post('/wisata/{id}', [WisataController::class, 'update']);
+        Route::delete('/wisata/{id}', [WisataController::class, 'destroy']);
+        Route::patch('/wisata/{id}/status', [WisataController::class, 'updateStatus']);
 
-    Route::get('/building-categories', [BuildingCategoriesController::class, 'index']);
-    Route::get('/building-groups', [BuildingGroupsController::class, 'index']);
+        Route::get('/kecamatan', [KecamatanController::class, 'index']);
+        Route::get('/desa', [DesaController::class, 'index']);
+
+        Route::get('/pengumuman', [PengumumanController::class, 'index']);
+        Route::get('/pengumuman', [PengumumanController::class, 'adminIndex']);
+        Route::get('/pengumuman/{slug}', [PengumumanController::class, 'show']);
+        Route::post('/pengumuman',                [PengumumanController::class, 'store']);
+        Route::post('/pengumuman/{id}',           [PengumumanController::class, 'update']);
+        Route::delete('/pengumuman/{id}',         [PengumumanController::class, 'destroy']);
+        Route::patch('/pengumuman/{id}/status',   [PengumumanController::class, 'updatePenting']);
+        Route::patch('/pengumuman/{id}/featured', [PengumumanController::class, 'updatePrioritas']);
+        // Route::get('/pengumuman/{judul}/{exceptId}', [PengumumanController::class, 'index']);
+        
+
+        Route::get('/berita', [BeritaController::class, 'index']);
+        Route::get('/berita', [BeritaController::class, 'adminIndex']);
+        Route::post('/berita',                [BeritaController::class, 'store']);
+        Route::post('/berita/{id}',           [BeritaController::class, 'update']);
+        Route::delete('/berita/{id}',         [BeritaController::class, 'destroy']);
+        Route::patch('/berita/{id}/status',   [BeritaController::class, 'updateStatus']);
+        Route::patch('/berita/{id}/featured', [BeritaController::class, 'updateFeatured']);
+
+        Route::get('/event', [EventController::class, 'index']);
+        Route::get('/event', [EventController::class, 'adminIndex']);
+        Route::post('/event', [EventController::class, 'store']);
+        Route::post('/event/{id}', [EventController::class, 'update']);
+        Route::delete('/event/{id}', [EventController::class, 'destroy']);
+        Route::patch('/event/{id}/status', [EventController::class, 'updateStatus']);
+        Route::get('/cctv', [CCTVController::class, 'index']);
+
+        Route::get('/buildings', [BuildingController::class, 'index']);
+        Route::post('/buildings', [BuildingController::class, 'store']);
+        Route::post('/buildings/{id}', [BuildingController::class, 'update']);
+        Route::patch('/buildings/{id}/status', [BuildingController::class, 'updateStatus']);
+        Route::delete('/buildings/{id}', [BuildingController::class, 'destroy']);
+
+        Route::get('/building-categories', [BuildingCategoriesController::class, 'index']);
+        Route::get('/building-groups', [BuildingGroupsController::class, 'index']);
+    });
+
+// api.php — tambah ini, HAPUS setelah SSO sudah ready
+Route::get('/dev/tiket/{user_id}', function ($user_id) {
+    try {
+        // Tanpa select kolom dulu — ambil semua kolom wisata
+        $orders = \App\Models\TicketOrder::with(['wisata:id,nama,thumbnail,kategori,slug,kecamatan_id'])
+        ->where('user_id', $user_id)
+        ->orderByDesc('created_at')
+        ->get();
+
+        $reviewedIds = [];
+        try {
+            $reviewedIds = \App\Models\Rating::where('user_id', $user_id)
+                ->pluck('wisata_id')->toArray();
+        } catch (\Throwable $e) {}
+
+        $orders = $orders->map(function ($o) use ($reviewedIds) {
+            $o->sudah_direview = in_array($o->wisata_id, $reviewedIds);
+            return $o;
+        });
+
+        return response()->json(['success' => true, 'data' => $orders]);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage(),
+            'file'    => basename($e->getFile()),
+            'line'    => $e->getLine(),
+        ], 500);
+    }
 });
-

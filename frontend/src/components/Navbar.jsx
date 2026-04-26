@@ -21,7 +21,7 @@ const navLinks = [
 ];
 
 // Ganti dengan nama user dari context/auth state kamu
-const DUMMY_USER = { nama: 'Nadya Kameela', loggedIn: true };
+const DUMMY_USER = { nama: 'Aizar Faruq Nafiul Umam', loggedIn: true };
 
 function getInitials(name = '') {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -358,9 +358,9 @@ export default function Navbar() {
                                     </div>
                                 </div>
                             ) : (
-                                <Link to="/login" className="btn-login">
-                                    <i className="fas fa-sign-in-alt" /> Masuk
-                                </Link>
+                                <a href="http://localhost:8000/auth/sso/redirect" className="btn-login">
+                                    <i className="fas fa-sign-in-alt" /> Login SSO
+                                </a>
                             )}
 
                             {/* Hamburger */}

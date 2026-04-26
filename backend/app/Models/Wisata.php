@@ -65,7 +65,7 @@ class Wisata extends Model
     protected $appends = ['alamat_lengkap'];
 
     public function getAlamatLengkapAttribute() {
-        return "Kecamatan " . ($this->kecamatan->nama) . ", Purbalingga";
+        return "Kecamatan " . ($this->kecamatan?->nama ?? '-') . ", Purbalingga";
     }
 
     // Tambahkan fungsi ini di Model Wisata DAN Model CCTV

@@ -15,14 +15,22 @@ export default function AdminLogin() {
     setError("");
     try {
       const res = await api.post("/admin/login", form);
-      localStorage.setItem("superadmin_token", res.data.token);
-      navigate("/superadmin");
+
+      // Simpan token & data user ke localStorage
+      localStorage.setItem("admin_token", res.data.token);
+      localStorage.setItem("admin_user", JSON.stringify(res.data.user));
+
+      // Redirect ke dashboard admin
+      navigate("/admin");
     } catch (err) {
-      setError(err.response?.data?.message || "Login gagal. Periksa kredensial Anda.");
+      setError(
+        err.response?.data?.message || "Login gagal. Periksa kredensial Anda."
+      );
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div style={{
